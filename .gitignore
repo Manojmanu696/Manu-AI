@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+data/*.db
+data/backups/*.zip
+frontend/node_modules/
+frontend/.next/
+.DS_Store
+.idea/
