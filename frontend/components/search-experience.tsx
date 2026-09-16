@@ -8,10 +8,9 @@ type SearchResult = { title: string; url: string; snippet?: string; source?: str
 type ChatResult = { answer?: string; mode?: string; facts?: string[]; assumptions?: string[] };
 type DiscoveryItem = {
   id: number; media_type: string; title: string; description?: string; genres?: string; tags?: string;
-  release_year?: number | null; image_url?: string; imdb_rating?: number | null; runtime?: string;
-  intensity?: string; ending_type?: string; ott_india?: string; seasons?: number | null; episodes?: number | null;
-  episode_duration?: string; author?: string; reading_length?: string; gameplay_style?: string;
-  player_modes?: string; difficulty?: string;
+  release_year?: number | null; image_url?: string; imdb_rating?: number | null; public_rating?: number | null;
+  runtime?: string; intensity?: string; ending_type?: string; ott_india?: string; seasons?: number | null; episodes?: number | null;
+  episode_duration?: string; author?: string; reading_length?: string; gameplay_style?: string; player_modes?: string; difficulty?: string;
 };
 type DiscoveryResult = { item: DiscoveryItem; score: number; reasons: string[]; source?: string };
 
@@ -24,12 +23,23 @@ const CATEGORIES = [
 const suffix: Record<string, string> = { movie: "movies", anime: "anime", tv: "TV shows", game: "video games", book: "books", video: "site:youtube.com", news: "news" };
 const genericQueries: Record<string, string[]> = {
   movie: ["movie", "movies", "film", "films", "watch", "recommendation", "recommendations"],
-  anime: ["anime", "animes", "watch"], tv: ["tv", "show", "shows", "series", "watch"],
-  game: ["game", "games", "gaming", "play"], book: ["book", "books", "read", "reading"],
+  anime: ["anime", "animes", "watch", "recommendation", "recommendations"], tv: ["tv", "show", "shows", "series", "watch", "recommendation", "recommendations"],
+  game: ["game", "games", "gaming", "play", "recommendation", "recommendations"], book: ["book", "books", "read", "reading", "recommendation", "recommendations"],
+};
+const mediaWords: Record<string, string[]> = {
+  movie: ["movie", "movies", "film", "films", "cinema", "watchlist", "watch"],
+  anime: ["anime", "manga", "otaku"], tv: ["tv", "show", "shows", "series", "season", "episode"],
+  game: ["game", "games", "gaming", "playstation", "xbox", "steam", "pc game"], book: ["book", "books", "novel", "novels", "reading"],
 };
 function scopedQuery(category: string, query: string) { return category === "all" ? query : `${query} ${suffix[category] || ""}`.trim(); }
 function isGenericMediaQuery(category: string, query: string) { const words = query.toLowerCase().split(/\s+/).filter(Boolean); const allowed = genericQueries[category] || []; return words.length > 0 && words.every((word) => allowed.includes(word)); }
 function mediaLabel(type: string) { return ({ movie: "Movie", anime: "Anime", tv: "TV Show", game: "Game", book: "Book" } as Record<string, string>)[type] || type; }
+function inferMediaCategory(query: string): string {
+  const normalized = query.toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
+  if (!normalized) return "all";
+  for (const [type, words] of Object.entries(mediaWords)) if (words.some((word) => normalized.split(/\s+/).includes(word))) return type;
+  return "all";
+}
 
 export default function SearchExperience() {
   const [mode, setMode] = useState<Mode>("ai");
@@ -66,14 +76,20 @@ export default function SearchExperience() {
   }, []);
 
   async function loadDiscovery(nextCategory: string, text: string) {
-    if (!["movie", "anime", "tv", "game", "book"].includes(nextCategory)) { setDiscovery([]); return; }
-    const params = new URLSearchParams({ media_type: nextCategory, limit: "12" });
-    if (text && !isGenericMediaQuery(nextCategory, text)) params.set("query", text);
+    const supported = ["movie", "anime", "tv", "game", "book"];
     try {
-      let rows = await api<DiscoveryResult[]>(`/discover?${params.toString()}`);
-      if (!rows.length && text && !isGenericMediaQuery(nextCategory, text)) {
-        const broad = new URLSearchParams({ media_type: nextCategory, limit: "12" });
-        rows = await api<DiscoveryResult[]>(`/discover?${broad.toString()}`);
+      let rows: DiscoveryResult[] = [];
+      if (supported.includes(nextCategory)) {
+        const params = new URLSearchParams({ media_type: nextCategory, limit: "12" });
+        if (text && !isGenericMediaQuery(nextCategory, text)) params.set("query", text);
+        rows = await api<DiscoveryResult[]>(`/discover?${params.toString()}`);
+        if (!rows.length && text && !isGenericMediaQuery(nextCategory, text)) {
+          const broad = new URLSearchParams({ media_type: nextCategory, limit: "12" });
+          rows = await api<DiscoveryResult[]>(`/discover?${broad.toString()}`);
+        }
+      } else if (text) {
+        const params = new URLSearchParams({ query: text, limit: "12" });
+        rows = await api<DiscoveryResult[]>(`/discover?${params.toString()}`);
       }
       setDiscovery(rows || []);
     } catch { setDiscovery([]); }
@@ -82,19 +98,24 @@ export default function SearchExperience() {
   async function runSearch(event?: FormEvent, forcedQuery?: string, forcedCategory?: string) {
     event?.preventDefault();
     const text = (forcedQuery ?? query).trim();
-    const activeCategory = forcedCategory ?? category;
     if (!text || busy) return;
-    setQuery(text); setBusy(true); setSearched(true); setError(""); setAnswer(null); setResults([]);
+    const inferred = forcedCategory ?? (category === "all" ? inferMediaCategory(text) : category);
+    setQuery(text);
+    if (inferred !== "all") setCategory(inferred);
+    setBusy(true); setSearched(true); setError(""); setAnswer(null); setResults([]); setDiscovery([]);
     try {
-      const web = await api<{ query: string; results: SearchResult[] }>("/research/search", { method: "POST", body: JSON.stringify({ query: scopedQuery(activeCategory, text) }) });
-      await loadDiscovery(activeCategory, text);
-      const webResults = web.results || []; setResults(webResults);
-      if (mode === "ai") {
+      const web = await api<{ query: string; results: SearchResult[] }>("/research/search", { method: "POST", body: JSON.stringify({ query: scopedQuery(inferred, text) }) });
+      const webResults = web.results || [];
+      setResults(webResults);
+      await loadDiscovery(inferred, text);
+      const isMediaSearch = ["movie", "anime", "tv", "game", "book"].includes(inferred);
+      if (mode === "ai" && !isMediaSearch) {
         const evidence = webResults.slice(0, 8).map((r, i) => `${i + 1}. ${r.title}\n${r.snippet || ""}\n${r.url}`).join("\n\n");
         const prompt = `${text}\n\nUse these fresh public web results as evidence. Give a concise useful answer. Do not invent facts. Personalise only from the local profile.\n${evidence}`;
         const ai = await api<ChatResult>("/chat", { method: "POST", body: JSON.stringify({ message: prompt }) });
         setAnswer(ai);
       }
+      if (mode === "google") setAnswer(null);
     } catch (e) { setError(e instanceof Error ? e.message : "Search failed"); }
     finally { setBusy(false); }
   }
@@ -120,7 +141,7 @@ export default function SearchExperience() {
       ) : (
         <div className="search-content">
           {answer && mode === "ai" && <article className="search-ai-answer"><div className="answer-label">MANU AI · WEB-AUGMENTED</div><p>{answer.answer?.trim() || "I found fresh results. The cards below contain the relevant matches."}</p>{!!answer.facts?.length && <div className="answer-facts">{answer.facts.slice(0, 5).map((f) => <span key={f}>✓ {f}</span>)}</div>}</article>}
-          {discovery.length > 0 && <section className="discovery-results"><div className="results-title"><div><span>PERSONALIZED {categoryLabel.toUpperCase()}</span><h2>Matches for “{query}”</h2></div><div className="result-actions"><span>{discovery.length} cards</span><button type="button" onClick={openGoogle}>Open Google ↗</button></div></div><div className="media-discovery-grid">{discovery.map((r) => <DiscoveryCard key={r.item.id} result={r} />)}</div></section>}
+          {discovery.length > 0 && <section className="discovery-results"><div className="results-title"><div><span>PERSONALIZED {categoryLabel.toUpperCase()}</span><h2>{categoryLabel === "All" ? "Matches" : `${categoryLabel} matches`} for “{query}”</h2></div><div className="result-actions"><span>{discovery.length} cards</span><button type="button" onClick={openGoogle}>Open Google ↗</button></div></div><div className="media-discovery-grid">{discovery.map((r) => <DiscoveryCard key={r.item.id} result={r} />)}</div></section>}
           <section className="web-results-block"><div className="results-title"><div><span>WEB RESULTS</span><h2>{results.length ? `Results for “${query}”` : "No web results"}</h2></div><div className="result-actions"><span>{categoryLabel}</span><button type="button" onClick={openGoogle}>Google ↗</button></div></div>{results.map((r) => <WebCard key={`${r.url}-${r.title}`} result={r} />)}{!results.length && !discovery.length && <div className="no-results-card">No matches came back. Try a broader query or open Google for the full web.</div>}</section>
         </div>
       )}
@@ -129,9 +150,9 @@ export default function SearchExperience() {
   );
 }
 
-function TasteCard({ recommendation }: { recommendation: Recommendation }) { const item = recommendation.item; return <article className="taste-card"><div className="taste-poster"><span>{item.media_type}</span><strong>{item.title.slice(0, 1)}</strong></div><div className="taste-copy"><span className="match">{recommendation.score}% <em>match for you</em></span><h3>{item.title}</h3><p>{item.genres || "Personal recommendation"}</p><small>{recommendation.reasons?.[0] || "Selected from your taste profile."}</small></div></article>; }
+function TasteCard({ recommendation }: { recommendation: Recommendation }) { const item = recommendation.item; return <article className="taste-card"><div className="taste-poster">{item.image_url ? <img src={item.image_url} alt="" /> : <><span>{item.media_type}</span><strong>{item.title.slice(0, 1)}</strong></>}</div><div className="taste-copy"><span className="match">{recommendation.score}% <em>match for you</em></span><h3>{item.title}</h3><p>{item.genres || "Personal recommendation"}</p><small>{recommendation.reasons?.[0] || "Selected from your taste profile."}</small></div></article>; }
 function DiscoveryCard({ result }: { result: DiscoveryResult }) {
   const item = result.item; const isSeries = item.media_type === "tv" || item.media_type === "anime";
-  return <article className="discovery-card"><div className="discovery-poster"><span>{mediaLabel(item.media_type)}</span><strong>{item.title.slice(0, 1)}</strong><b>{result.score}% match</b></div><div className="discovery-card-body"><div className="card-title-row"><div><h3>{item.title}</h3><p>{item.release_year || "—"} · {item.genres || mediaLabel(item.media_type)}</p></div>{item.imdb_rating ? <strong className="imdb">IMDb {item.imdb_rating}</strong> : null}</div><p className="card-description">{item.description || "Selected from Manu AI's discovery catalogue."}</p><div className="meta-pills">{item.runtime && <span>⏱ {item.runtime}</span>}{item.intensity && <span>⚡ {item.intensity}</span>}{item.ending_type && <span>◈ {item.ending_type}</span>}{item.ott_india && <span>▣ {item.ott_india}</span>}{isSeries && item.seasons ? <span>▤ {item.seasons} seasons</span> : null}{isSeries && item.episodes ? <span>• {item.episodes} episodes</span> : null}{isSeries && item.episode_duration ? <span>⌛ {item.episode_duration}</span> : null}{item.media_type === "game" && item.player_modes ? <span>◉ {item.player_modes}</span> : null}{item.media_type === "game" && item.difficulty ? <span>◆ {item.difficulty}</span> : null}{item.media_type === "book" && item.author ? <span>✎ {item.author}</span> : null}{item.media_type === "book" && item.reading_length ? <span>⌛ {item.reading_length}</span> : null}</div><p className="fit-reason">✦ {result.reasons?.[0] || "Matches your saved taste profile."}</p></div></article>;
+  return <article className="discovery-card"><div className="discovery-poster">{item.image_url ? <img src={item.image_url} alt="" /> : <><span>{mediaLabel(item.media_type)}</span><strong>{item.title.slice(0, 1)}</strong></>}<b>{result.score}% match</b></div><div className="discovery-card-body"><div className="card-title-row"><div><h3>{item.title}</h3><p>{item.release_year || "—"} · {item.genres || mediaLabel(item.media_type)}</p></div>{item.imdb_rating ? <strong className="imdb">IMDb {item.imdb_rating}</strong> : null}</div><p className="card-description">{item.description || "Selected from Manu AI's discovery catalogue."}</p><div className="meta-pills">{item.public_rating ? <span>★ Manu {item.public_rating}</span> : null}{item.runtime && <span>⏱ {item.runtime}</span>}{item.intensity && <span>⚡ {item.intensity}</span>}{item.ending_type && <span>◈ {item.ending_type}</span>}{item.ott_india && <span>▣ {item.ott_india}</span>}{isSeries && item.seasons ? <span>▤ {item.seasons} seasons</span> : null}{isSeries && item.episodes ? <span>• {item.episodes} episodes</span> : null}{isSeries && item.episode_duration ? <span>⌛ {item.episode_duration}</span> : null}{item.media_type === "game" && item.player_modes ? <span>◉ {item.player_modes}</span> : null}{item.media_type === "game" && item.difficulty ? <span>◆ {item.difficulty}</span> : null}{item.media_type === "book" && item.author ? <span>✎ {item.author}</span> : null}{item.media_type === "book" && item.reading_length ? <span>⌛ {item.reading_length}</span> : null}</div><p className="fit-reason">✦ {result.reasons?.[0] || "Matches your saved taste profile."}</p></div></article>;
 }
 function WebCard({ result }: { result: SearchResult }) { let host = result.url; try { host = new URL(result.url).hostname; } catch {} return <a className="search-result-card" href={result.url} target="_blank" rel="noreferrer"><small>{host}</small><h3>{result.title}</h3><p>{result.snippet || "Open this result."}</p></a>; }
