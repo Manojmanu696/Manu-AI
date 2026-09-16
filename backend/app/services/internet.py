@@ -1,7 +1,4 @@
-"""Provider-neutral, read-only internet research tools for Manu AI.
-
-No personal library records are sent to these tools. They accept only a query or public URL.
-"""
+"""Provider-neutral, read-only internet research tools for Manu AI."""
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
@@ -13,12 +10,12 @@ import json
 import re
 import socket
 from typing import Any
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 from ..config import WEB_REQUEST_TIMEOUT_SECONDS, WEB_SEARCH_PROVIDER
 
-USER_AGENT = "ManuAI/0.2 (+local personal discovery research)"
+USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0 Safari/537.36 ManuAI/0.4"
 
 
 @dataclass
@@ -55,8 +52,7 @@ class _DuckDuckGoParser(HTMLParser):
             parsed = urlparse(raw_url)
             redirect = parse_qs(parsed.query).get("uddg", [""])[0]
             self._url = unquote(redirect or raw_url)
-            self._title = []
-            self._snippet = []
+            self._title, self._snippet = [], []
             self._in_result = True
         elif self._in_result and "result__snippet" in classes:
             self._in_snippet = True
@@ -77,15 +73,21 @@ class _DuckDuckGoParser(HTMLParser):
 
 
 class DuckDuckGoHtmlSearchProvider(WebSearchProvider):
-    """A no-key, provider-swappable search adapter using DuckDuckGo's HTML endpoint."""
-    endpoint = "https://html.duckduckgo.com/html/?q="
+    """No-key search adapter using DuckDuckGo's lightweight HTML form endpoint."""
+    endpoint = "https://html.duckduckgo.com/html/"
 
     def search(self, query: str, limit: int = 5) -> list[SearchResult]:
         if not query.strip():
             return []
-        request = Request(self.endpoint + quote_plus(query[:500]), headers={"User-Agent": USER_AGENT, "Accept": "text/html"})
+        data = urlencode({"q": query[:500], "kl": "in-en", "kp": "-1"}).encode("utf-8")
+        request = Request(
+            self.endpoint,
+            data=data,
+            method="POST",
+            headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml", "Referer": self.endpoint},
+        )
         with urlopen(request, timeout=WEB_REQUEST_TIMEOUT_SECONDS) as response:
-            html = response.read(500_000).decode(response.headers.get_content_charset() or "utf-8", errors="replace")
+            html = response.read(800_000).decode(response.headers.get_content_charset() or "utf-8", errors="replace")
         parser = _DuckDuckGoParser()
         parser.feed(html)
         return parser.results[:limit]
@@ -111,7 +113,6 @@ class WebFetchTool:
 
 
 class ReadOnlyBrowserTool:
-    """Explicit browser boundary. It can read public pages but exposes no click/form/action API."""
     name = "read_only_browser"
     supports_automation = False
 
@@ -154,7 +155,6 @@ def current_search_provider() -> WebSearchProvider:
 
 
 def tool_definitions() -> list[dict[str, Any]]:
-    """Ollama-compatible schemas for the only two tools the model may autonomously invoke."""
     return [
         {"type": "function", "function": {"name": "web_search", "description": "Search the public web for current factual discovery information. Never use this for private data.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
         {"type": "function", "function": {"name": "web_fetch", "description": "Fetch and read a public web page returned by search. Read-only: it cannot log in, submit forms, purchase, or change accounts.", "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
