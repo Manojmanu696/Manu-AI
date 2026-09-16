@@ -1,10 +1,30 @@
 from .main import *
 from fastapi import Query, HTTPException, Depends
 from sqlalchemy.orm import Session
-from .database import get_db
-from .models import CatalogueItem, RecommendationFeedback
+from .database import get_db, SessionLocal
+from .models import CatalogueItem, RecommendationFeedback, Memory
 from .schemas import FeedbackCreate, InternetQuery
 from .services.discovery import discover, web_discover
+from .seed_profile import SEED_MEMORIES
+
+# Discovery data is separate from the user's personal library. Seed it automatically
+# so the first search is useful without requiring a demo-library import.
+def _bootstrap_discovery_data():
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        if db.query(Memory).count() == 0:
+            for memory in SEED_MEMORIES:
+                db.add(Memory(**memory, is_demo=False))
+        if db.query(CatalogueItem).count() == 0:
+            from .demo import DEMO_CATALOGUE
+            for item in DEMO_CATALOGUE:
+                db.add(CatalogueItem(**item, is_demo=True))
+        db.commit()
+    finally:
+        db.close()
+
+_bootstrap_discovery_data()
 
 @app.get("/discover")
 def get_discover(media_type: str|None=None, query: str|None=None, limit: int=Query(24, ge=1, le=50), db: Session=Depends(get_db)):
