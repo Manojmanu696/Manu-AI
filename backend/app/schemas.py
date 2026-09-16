@@ -66,8 +66,10 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     answer: str
     mode: str
+    model: str | None = None
     facts: list[str]
     recommendations: list[dict]
+    sources: list[dict] = Field(default_factory=list)
     assumptions: list[str]
 
 
