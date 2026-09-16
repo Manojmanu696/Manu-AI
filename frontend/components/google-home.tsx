@@ -6,14 +6,8 @@ import { api, Recommendation } from "@/lib/api";
 import { Icon } from "@/components/icons";
 
 const CATEGORIES = [
-  { id: "all", label: "All" },
-  { id: "movie", label: "Movies" },
-  { id: "anime", label: "Anime" },
-  { id: "tv", label: "TV Shows" },
-  { id: "game", label: "Games" },
-  { id: "book", label: "Books" },
-  { id: "video", label: "Videos" },
-  { id: "news", label: "News" },
+  { id: "all", label: "All" }, { id: "movie", label: "Movies" }, { id: "anime", label: "Anime" }, { id: "tv", label: "TV Shows" },
+  { id: "game", label: "Games" }, { id: "book", label: "Books" }, { id: "video", label: "Videos" }, { id: "news", label: "News" },
 ];
 
 type SearchResult = { title: string; url: string; snippet?: string; provider?: string; source?: string };
@@ -26,6 +20,7 @@ function searchQueryFor(category: string, query: string) {
 
 export default function GoogleHome() {
   const pathname = usePathname();
+  const [isHome, setIsHome] = useState(true);
   const [mode, setMode] = useState<"ai" | "web">("ai");
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
@@ -39,15 +34,27 @@ export default function GoogleHome() {
 
   useEffect(() => {
     if (pathname !== "/") return;
+    const updateActivePage = () => {
+      const active = document.querySelector(".sidebar .nav-item.active span")?.textContent?.trim();
+      setIsHome(!active || active === "Home");
+    };
+    updateActivePage();
+    const observer = new MutationObserver(updateActivePage);
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, [pathname]);
+
+  useEffect(() => {
+    if (pathname !== "/" || !isHome) return;
     let cancelled = false;
     (async () => { try {
       const local = category !== "all" && !["video", "news"].includes(category) ? await api<Recommendation[]>(`/recommendations?media_type=${encodeURIComponent(category)}&limit=6`) : await api<Recommendation[]>("/recommendations?limit=6");
       if (!cancelled) setRecommendations(local || []);
-    } catch { /* the main app still works if the backend is offline */ } })();
+    } catch { /* homepage remains usable when the backend is offline */ } })();
     return () => { cancelled = true; };
-  }, [category, pathname]);
+  }, [category, isHome, pathname]);
 
-  if (pathname !== "/") return null;
+  if (pathname !== "/" || !isHome) return null;
 
   const runSearch = async (event?: FormEvent, forcedQuery?: string) => {
     event?.preventDefault();
@@ -74,8 +81,8 @@ export default function GoogleHome() {
     <div className="google-center">
       <p className="google-kicker">PERSONAL SEARCH & DISCOVERY</p><h1>Manu<span>AI</span></h1><p className="google-subtitle">Search the web. Ask AI. Find what you actually want.</p>
       <form className="google-search" onSubmit={runSearch}><Icon name="search" size={21}/><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search the web or ask Manu AI anything…" aria-label="Search" /><div className="search-mode" aria-label="Search mode"><button type="button" className={mode === "ai" ? "selected" : ""} onClick={() => setMode("ai")}>✦ AI</button><span></span><button type="button" className={mode === "web" ? "selected" : ""} onClick={() => setMode("web")}>⌕ Web</button></div><button className="search-submit" aria-label="Search" disabled={busy}>{busy ? "…" : "→"}</button></form>
-      <div className="category-strip" aria-label="Search category">{CATEGORIES.map((item) => <button key={item.id} className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>
-      {!searched && <div className="google-quick"><button onClick={() => quickSearch("best movies to watch tonight")}>🎬 Movies</button><button onClick={() => quickSearch("best anime to watch")}>✦ Anime</button><button onClick={() => quickSearch("best games to play")}>◉ Games</button><button onClick={() => quickSearch("best books to read")}>▰ Books</button><button onClick={() => quickSearch("latest technology news")}>⌁ News</button></div>}
+      <div className="category-strip" aria-label="Search category">{CATEGORIES.map((item) => <button key={item.id} type="button" className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.label}</button>)}</div>
+      {!searched && <div className="google-quick"><button type="button" onClick={() => quickSearch("best movies to watch tonight")}>🎬 Movies</button><button type="button" onClick={() => quickSearch("best anime to watch")}>✦ Anime</button><button type="button" onClick={() => quickSearch("best games to play")}>◉ Games</button><button type="button" onClick={() => quickSearch("best books to read")}>▰ Books</button><button type="button" onClick={() => quickSearch("latest technology news")}>⌁ News</button></div>}
     </div>
     {error && <div className="google-error">{error}. Make sure the Manu AI backend is running on port 8000.</div>}
     {searched && <div className="search-results-area">
