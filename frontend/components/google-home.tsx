@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { api, Recommendation } from "@/lib/api";
 import { Icon } from "@/components/icons";
 
@@ -24,6 +25,7 @@ function searchQueryFor(category: string, query: string) {
 }
 
 export default function GoogleHome() {
+  const pathname = usePathname();
   const [mode, setMode] = useState<"ai" | "web">("ai");
   const [category, setCategory] = useState("all");
   const [query, setQuery] = useState("");
@@ -34,6 +36,18 @@ export default function GoogleHome() {
   const [error, setError] = useState("");
   const [searched, setSearched] = useState(false);
   const categoryLabel = useMemo(() => CATEGORIES.find((x) => x.id === category)?.label || "All", [category]);
+
+  useEffect(() => {
+    if (pathname !== "/") return;
+    let cancelled = false;
+    (async () => { try {
+      const local = category !== "all" && !["video", "news"].includes(category) ? await api<Recommendation[]>(`/recommendations?media_type=${encodeURIComponent(category)}&limit=6`) : await api<Recommendation[]>("/recommendations?limit=6");
+      if (!cancelled) setRecommendations(local || []);
+    } catch { /* the main app still works if the backend is offline */ } })();
+    return () => { cancelled = true; };
+  }, [category, pathname]);
+
+  if (pathname !== "/") return null;
 
   const runSearch = async (event?: FormEvent, forcedQuery?: string) => {
     event?.preventDefault();
@@ -52,15 +66,6 @@ export default function GoogleHome() {
     } catch (e) { setError(e instanceof Error ? e.message : "Search failed"); setResults([]); }
     finally { setBusy(false); }
   };
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => { try {
-      const local = category !== "all" && !["video", "news"].includes(category) ? await api<Recommendation[]>(`/recommendations?media_type=${encodeURIComponent(category)}&limit=6`) : await api<Recommendation[]>("/recommendations?limit=6");
-      if (!cancelled) setRecommendations(local || []);
-    } catch { /* backend errors are shown after an actual search */ } })();
-    return () => { cancelled = true; };
-  }, [category]);
 
   const quickSearch = (value: string) => { setQuery(value); void runSearch(undefined, value); };
 
