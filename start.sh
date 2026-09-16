@@ -23,7 +23,10 @@ WEB_PORT="$(free_port 3000)"
 cleanup() { kill "${API_PID:-}" "${WEB_PID:-}" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 
-python -m uvicorn app.main_discovery:app --app-dir backend --reload --port "$API_PORT" &
+# Keep the backend in a single process so Ctrl+C reliably stops it.
+# Pass the dynamically selected frontend origin so CORS still works on 3001, 3002, etc.
+ALLOWED_ORIGINS="http://localhost:$WEB_PORT,http://127.0.0.1:$WEB_PORT" \
+  python -m uvicorn app.main_discovery:app --app-dir backend --port "$API_PORT" &
 API_PID=$!
 (cd frontend && PORT="$WEB_PORT" NEXT_PUBLIC_API_URL="http://127.0.0.1:$API_PORT" npm run dev) &
 WEB_PID=$!
