@@ -1,119 +1,38 @@
 "use client";
-
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { api, Recommendation } from "@/lib/api";
 
-type Mode = "ai" | "google";
-type SearchResult = { title: string; url: string; snippet?: string; source?: string; provider?: string };
-type ChatResult = { answer?: string; mode?: string; facts?: string[]; assumptions?: string[] };
-type DiscoveryItem = {
-  id: number; media_type: string; title: string; description?: string; genres?: string; tags?: string;
-  release_year?: number | null; image_url?: string; imdb_rating?: number | null; public_rating?: number | null;
-  runtime?: string; intensity?: string; ending_type?: string; ott_india?: string; seasons?: number | null; episodes?: number | null;
-  episode_duration?: string; author?: string; reading_length?: string; gameplay_style?: string; player_modes?: string; difficulty?: string;
-  languages?: string; watch_url?: string; source_url?: string; source?: string; source_retrieved_at?: string;
-};
-type DiscoveryResult = { item: DiscoveryItem; score: number; reasons: string[]; source?: string };
+type Mode="ai"|"google";
+type SearchResult={title:string;url:string;snippet?:string;provider?:string};
+type DiscoveryItem={id:number;media_type:string;title:string;description?:string;genres?:string;release_year?:number|null;image_url?:string;imdb_rating?:number|null;public_rating?:number|null;runtime?:string;ott_india?:string;seasons?:number|null;episodes?:number|null;episode_duration?:string;languages?:string;watch_url?:string;source_url?:string;source?:string;trailer_url?:string};
+type DiscoveryResult={item:DiscoveryItem;score:number;reasons:string[];source?:string};
+type ChatResult={answer?:string;facts?:string[]};
+const CATEGORIES=[{id:"all",label:"All",icon:"⌕"},{id:"movie",label:"Movies",icon:"🎬"},{id:"anime",label:"Anime",icon:"✦"},{id:"tv",label:"TV Shows",icon:"▣"},{id:"game",label:"Games",icon:"◉"},{id:"book",label:"Books",icon:"▰"},{id:"video",label:"Videos",icon:"▶"},{id:"news",label:"News",icon:"⌁"},{id:"website",label:"Websites",icon:"↗"}] as const;
+const mediaWords:Record<string,string[]>={movie:["movie","movies","film","films","cinema"],anime:["anime","manga"],tv:["tv","show","shows","series","season","episode"],game:["game","games","gaming","steam","xbox","playstation"],book:["book","books","novel","novels","reading"]};
+function infer(q:string){const words=q.toLowerCase().replace(/[^a-z0-9]+/g," ").split(/\s+/);for(const [type,keys] of Object.entries(mediaWords))if(keys.some(k=>words.includes(k)))return type;return "all"}
+function googleUrl(q:string,cat:string){const extra=cat==="movie"?" movies":cat==="anime"?" anime":cat==="tv"?" TV series":cat==="game"?" video games":cat==="book"?" books":cat==="video"?" videos":cat==="news"?" news":"";return `https://www.google.com/search?q=${encodeURIComponent(q+extra)}`}
 
-const CATEGORIES = [
-  { id: "all", label: "All", icon: "⌕" }, { id: "movie", label: "Movies", icon: "🎬" },
-  { id: "anime", label: "Anime", icon: "✦" }, { id: "tv", label: "TV Shows", icon: "▣" },
-  { id: "game", label: "Games", icon: "◉" }, { id: "book", label: "Books", icon: "▰" },
-  { id: "video", label: "Videos", icon: "▶" }, { id: "news", label: "News", icon: "⌁" },
-] as const;
-const suffix: Record<string, string> = { movie: "movies", anime: "anime", tv: "TV shows", game: "video games", book: "books", video: "site:youtube.com", news: "news" };
-const genericQueries: Record<string, string[]> = {
-  movie: ["movie", "movies", "film", "films", "watch", "recommendation", "recommendations"],
-  anime: ["anime", "animes", "watch", "recommendation", "recommendations"], tv: ["tv", "show", "shows", "series", "watch", "recommendation", "recommendations"],
-  game: ["game", "games", "gaming", "play", "recommendation", "recommendations"], book: ["book", "books", "read", "reading", "recommendation", "recommendations"],
-};
-const mediaWords: Record<string, string[]> = {
-  movie: ["movie", "movies", "film", "films", "cinema", "watchlist", "watch"],
-  anime: ["anime", "manga", "otaku"], tv: ["tv", "show", "shows", "series", "season", "episode"],
-  game: ["game", "games", "gaming", "playstation", "xbox", "steam", "pc game"], book: ["book", "books", "novel", "novels", "reading"],
-};
-function scopedQuery(category: string, query: string) { return category === "all" ? query : `${query} ${suffix[category] || ""}`.trim(); }
-function isGenericMediaQuery(category: string, query: string) { const words = query.toLowerCase().split(/\s+/).filter(Boolean); const allowed = genericQueries[category] || []; return words.length > 0 && words.every((word) => allowed.includes(word)); }
-function mediaLabel(type: string) { return ({ movie: "Movie", anime: "Anime", tv: "TV Show", game: "Game", book: "Book" } as Record<string, string>)[type] || type; }
-function inferMediaCategory(query: string): string {
-  const normalized = query.toLowerCase().replace(/[^a-z0-9+]+/g, " ").trim();
-  if (!normalized) return "all";
-  for (const [type, words] of Object.entries(mediaWords)) if (words.some((word) => normalized.split(/\s+/).includes(word))) return type;
-  return "all";
+export default function SearchExperience(){
+ const[mode,setMode]=useState<Mode>("ai"),[category,setCategory]=useState("all"),[query,setQuery]=useState(""),[results,setResults]=useState<SearchResult[]>([]),[discovery,setDiscovery]=useState<DiscoveryResult[]>([]),[answer,setAnswer]=useState<ChatResult|null>(null),[localRecs,setLocalRecs]=useState<Recommendation[]>([]),[busy,setBusy]=useState(false),[searched,setSearched]=useState(false),[error,setError]=useState("");
+ useEffect(()=>{api<Recommendation[]>("/recommendations?limit=12").then(setLocalRecs).catch(()=>setLocalRecs([]))},[]);
+ useEffect(()=>{const h=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();document.querySelector<HTMLInputElement>(".global-search input")?.focus()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[]);
+ async function runSearch(e?:FormEvent){e?.preventDefault();const text=query.trim();if(!text||busy)return;const inferred=category==="all"?infer(text):category;setCategory(inferred);setSearched(true);setBusy(true);setError("");setAnswer(null);setResults([]);setDiscovery([]);
+   if(mode==="google")window.open(googleUrl(text,inferred),"_blank","noopener,noreferrer");
+   try{
+     if(["movie","anime","tv","game","book"].includes(inferred)){const p=new URLSearchParams({media_type:inferred,limit:"18",query:text});const d=await api<DiscoveryResult[]>(`/discover?${p}`);setDiscovery(d||[])}
+     let web:{results:SearchResult[]}={results:[]};try{web=await api<{results:SearchResult[]}>(`/research/search`,{method:"POST",body:JSON.stringify({query:text})});setResults(web.results||[])}catch(err){if(mode==="ai")throw err;setError("Google was opened for the full web. Structured media results are shown here when available.")}
+     if(mode==="ai"&&inferred==="all"&&web.results?.length){const evidence=web.results.slice(0,8).map((r,i)=>`${i+1}. ${r.title}\n${r.snippet||""}\n${r.url}`).join("\n\n");const a=await api<ChatResult>("/chat",{method:"POST",body:JSON.stringify({message:`Answer this query using the fresh public web evidence below. Do not invent facts. Query: ${text}\n\n${evidence}`})});setAnswer(a)}
+   }catch(err){setError(err instanceof Error?err.message:"Search failed")}finally{setBusy(false)}
+ }
+ const quick=(q:string,c:string)=>{setQuery(q);setCategory(c);setTimeout(()=>void runSearch(),0)};const catLabel=CATEGORIES.find(c=>c.id===category)?.label||"All";
+ return <section className="search-experience" aria-label="Manu AI search"><div className="search-topbar"><div className="search-brand"><span>M</span><strong>Manu</strong><b>AI</b></div><div className="search-top-actions"><button onClick={()=>setMode("google")} className={mode==="google"?"active":""}>Google</button><button onClick={()=>setMode("ai")} className={mode==="ai"?"active":""}>AI</button><div className="search-avatar">M</div></div></div>
+ <main className="search-hero"><div className="search-kicker">PERSONAL SEARCH & DISCOVERY</div><h1>Manu<span>AI</span></h1><p>Search the web, discover media, and use your personal taste — from one box.</p><form className="global-search" onSubmit={runSearch}><span className="search-icon">⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything…" aria-label="Search anything" autoFocus/><div className="mode-toggle"><button type="button" className={mode==="ai"?"active":""} onClick={()=>setMode("ai")}>✦ AI Search</button><i/><button type="button" className={mode==="google"?"active":""} onClick={()=>setMode("google")}>G Google</button></div><button className="global-submit" type="submit" disabled={busy}>{busy?"…":"→"}</button></form><div className="category-strip">{CATEGORIES.map(c=><button key={c.id} type="button" className={category===c.id?"active":""} onClick={()=>setCategory(c.id)}>{c.icon} {c.label}</button>)}</div><div className="search-hint">⌘ K to focus · choose a type for personalized cards</div></main>
+ {error&&<div className="search-error">{error}</div>}
+ {!searched?<div className="discovery-content">{localRecs.length>0&&<section className="taste-section"><div className="results-title"><div><span>YOUR TASTE</span><h2>Recommended for you</h2></div><button onClick={()=>quick("movies I should watch","movie")}>Explore movies →</button></div><div className="recommendation-grid-search">{localRecs.slice(0,6).map(r=><article className="taste-card" key={r.item.id}><div className="taste-poster">{r.item.image_url&&<img src={r.item.image_url} alt=""/>}</div><div className="taste-copy"><span className="match">{r.score}% <em>match</em></span><h3>{r.item.title}</h3><p>{r.item.genres||"Personal pick"}</p><small>{r.reasons?.[0]}</small></div></article>)}</div></section>}</div>:<div className="search-content">
+ {answer&&mode==="ai"&&<article className="search-ai-answer"><div className="answer-label">MANU AI · WEB-AUGMENTED</div><p>{answer.answer}</p>{answer.facts?.length?<div className="answer-facts">{answer.facts.slice(0,5).map(f=><span key={f}>✓ {f}</span>)}</div>:null}</article>}
+ {discovery.length>0&&<section className="discovery-results"><div className="results-title"><div><span>PERSONALIZED {catLabel.toUpperCase()}</span><h2>{catLabel} matches for “{query}”</h2></div><div className="result-actions"><span>{discovery.length} cards</span><button onClick={()=>window.open(googleUrl(query,category),"_blank","noopener,noreferrer")}>Google ↗</button></div></div><div className="media-discovery-grid">{discovery.map(r=><DiscoveryCard key={`${r.item.id}-${r.item.title}`} result={r}/>)}</div></section>}
+ <section className="web-results-block"><div className="results-title"><div><span>WEB RESULTS</span><h2>{results.length?`Results for “${query}”`:mode==="google"?"Google search opened":"No web results"}</h2></div>{mode==="google"&&<button onClick={()=>window.open(googleUrl(query,category),"_blank","noopener,noreferrer")}>Open Google ↗</button>}</div>{results.map(r=><a className="search-result-card" key={`${r.url}-${r.title}`} href={r.url} target="_blank" rel="noreferrer"><small>{(()=>{try{return new URL(r.url).hostname}catch{return r.url}})()}</small><h3>{r.title}</h3><p>{r.snippet||"Open result"}</p></a>)}{!results.length&&!discovery.length&&mode!=="google"&&<div className="no-results-card">No public results returned. Configure a web-search provider in your local environment or use Google.</div>}</section></div>}
+ <footer className="search-footer"><span>Private library stays local</span><span>Web search on demand</span><span>AI uses fresh public evidence</span></footer></section>
 }
 
-export default function SearchExperience() {
-  const [mode, setMode] = useState<Mode>("ai");
-  const [category, setCategory] = useState("all");
-  const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [answer, setAnswer] = useState<ChatResult | null>(null);
-  const [localRecs, setLocalRecs] = useState<Recommendation[]>([]);
-  const [discovery, setDiscovery] = useState<DiscoveryResult[]>([]);
-  const [busy, setBusy] = useState(false);
-  const [searched, setSearched] = useState(false);
-  const [error, setError] = useState("");
-  const categoryLabel = useMemo(() => CATEGORIES.find((x) => x.id === category)?.label || "All", [category]);
-
-  useEffect(() => { api<Recommendation[]>("/recommendations?limit=12").then(setLocalRecs).catch(() => setLocalRecs([])); }, []);
-
-  async function loadDiscovery(nextCategory: string, text: string) {
-    const supported = ["movie", "anime", "tv", "game", "book"];
-    if (!supported.includes(nextCategory)) { setDiscovery([]); return; }
-    const params = new URLSearchParams({ media_type: nextCategory, limit: "12" });
-    if (text && !isGenericMediaQuery(nextCategory, text)) params.set("query", text);
-    const rows = await api<DiscoveryResult[]>(`/discover?${params.toString()}`);
-    setDiscovery(rows || []);
-  }
-
-  async function runSearch(event?: FormEvent, forcedQuery?: string, forcedCategory?: string) {
-    event?.preventDefault();
-    const text = (forcedQuery ?? query).trim();
-    if (!text || busy) return;
-    const selectedCategory = forcedCategory ?? category;
-    const inferred = selectedCategory === "all" ? inferMediaCategory(text) : selectedCategory;
-    setQuery(text); if (inferred !== "all") setCategory(inferred);
-    setBusy(true); setSearched(true); setError(""); setAnswer(null); setResults([]); setDiscovery([]);
-    try {
-      const web = await api<{ query: string; results: SearchResult[] }>("/research/search", { method: "POST", body: JSON.stringify({ query: scopedQuery(inferred, text) }) });
-      const webResults = web.results || [];
-      setResults(webResults);
-      await loadDiscovery(inferred, text);
-      const isMediaSearch = ["movie", "anime", "tv", "game", "book"].includes(inferred);
-      if (mode === "ai" && !isMediaSearch && webResults.length) {
-        const evidence = webResults.slice(0, 8).map((r, i) => `${i + 1}. ${r.title}\n${r.snippet || ""}\n${r.url}`).join("\n\n");
-        const ai = await api<ChatResult>("/chat", { method: "POST", body: JSON.stringify({ message: `${text}\n\nUse these fresh public web results as evidence. Do not invent facts. Personalise only from the local profile.\n${evidence}` }) });
-        setAnswer(ai);
-      }
-    } catch (e) { setError(e instanceof Error ? e.message : "Search failed"); }
-    finally { setBusy(false); }
-  }
-
-  const quickSearch = (value: string, nextCategory = category) => { setCategory(nextCategory); setQuery(value); void runSearch(undefined, value, nextCategory); };
-  const openGoogle = () => { const text = query.trim(); if (!text) return; window.open(`https://www.google.com/search?q=${encodeURIComponent(scopedQuery(category, text))}`, "_blank", "noopener,noreferrer"); };
-
-  return <section className="search-experience" aria-label="Manu AI global search">
-    <header className="search-topbar"><div className="search-brand"><span>M</span><strong>Manu</strong><b>AI</b></div><div className="search-top-actions"><button type="button" onClick={() => setMode("google")}>Google</button><button type="button" onClick={() => setMode("ai")}>AI</button><div className="search-avatar">M</div></div></header>
-    <main className="search-hero">
-      <div className="search-kicker">PERSONAL SEARCH & DISCOVERY</div><h1>Manu<span>AI</span></h1><p>One search box for the web, your library, and your personal AI.</p>
-      <form className="global-search" onSubmit={runSearch}><span className="search-icon">⌕</span><input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search anything…" aria-label="Search anything" /><div className="mode-toggle" aria-label="Search mode"><button type="button" className={mode === "ai" ? "active" : ""} onClick={() => setMode("ai")}>✦ AI Search</button><i /><button type="button" className={mode === "google" ? "active" : ""} onClick={() => setMode("google")}>G Google</button></div><button className="global-submit" type="submit" disabled={busy}>{busy ? "…" : "→"}</button></form>
-      <div className="category-strip">{CATEGORIES.map((item) => <button key={item.id} type="button" className={category === item.id ? "active" : ""} onClick={() => setCategory(item.id)}>{item.icon} {item.label}</button>)}</div><div className="search-hint">⌘ K to focus · Choose a type to get personalized cards</div>
-    </main>
-    {error && <div className="search-error">{error}</div>}
-    {!searched ? <div className="discovery-content">{localRecs.length > 0 && <section className="taste-section"><div className="results-title"><div><span>YOUR TASTE</span><h2>Recommended for you</h2></div><button type="button" onClick={() => quickSearch("movies I should watch", "movie")}>Explore movies →</button></div><div className="recommendation-grid-search">{localRecs.slice(0, 6).map((r) => <TasteCard key={r.item.id} recommendation={r} />)}</div></section>}</div> : <div className="search-content">
-      {answer && mode === "ai" && <article className="search-ai-answer"><div className="answer-label">MANU AI · WEB-AUGMENTED</div><p>{answer.answer?.trim() || "I found fresh public results."}</p>{!!answer.facts?.length && <div className="answer-facts">{answer.facts.slice(0, 5).map((f) => <span key={f}>✓ {f}</span>)}</div>}</article>}
-      {discovery.length > 0 && <section className="discovery-results"><div className="results-title"><div><span>PERSONALIZED {categoryLabel.toUpperCase()}</span><h2>{categoryLabel === "All" ? "Matches" : `${categoryLabel} matches`} for “{query}”</h2></div><div className="result-actions"><span>{discovery.length} cards</span><button type="button" onClick={openGoogle}>Open Google ↗</button></div></div><div className="media-discovery-grid">{discovery.map((r) => <DiscoveryCard key={`${r.item.id}-${r.item.title}`} result={r} />)}</div></section>}
-      <section className="web-results-block"><div className="results-title"><div><span>WEB RESULTS</span><h2>{results.length ? `Results for “${query}”` : "No web results"}</h2></div><div className="result-actions"><span>{categoryLabel}</span><button type="button" onClick={openGoogle}>Google ↗</button></div></div>{results.map((r) => <WebCard key={`${r.url}-${r.title}`} result={r} />)}{!results.length && !discovery.length && <div className="no-results-card">No public results were returned. Try another query or open Google for the full web.</div>}</section>
-    </div>}
-    <footer className="search-footer"><span>Private library stays local</span><span>Web search is on-demand</span><span>AI search uses fresh public results</span></footer>
-  </section>;
-}
-
-function TasteCard({ recommendation }: { recommendation: Recommendation }) { const item = recommendation.item; return <article className="taste-card"><div className="taste-poster">{item.image_url ? <img src={item.image_url} alt="" /> : <><span>{item.media_type}</span><strong>{item.title.slice(0, 1)}</strong></>}</div><div className="taste-copy"><span className="match">{recommendation.score}% <em>match for you</em></span><h3>{item.title}</h3><p>{item.genres || "Personal recommendation"}</p><small>{recommendation.reasons?.[0] || "Selected from your taste profile."}</small></div></article>; }
-
-function DiscoveryCard({ result }: { result: DiscoveryResult }) {
-  const item = result.item; const isSeries = item.media_type === "tv" || item.media_type === "anime";
-  return <article className="discovery-card"><div className="discovery-poster">{item.image_url ? <img src={item.image_url} alt={`${item.title} poster`} /> : <><span>{mediaLabel(item.media_type)}</span><strong>{item.title.slice(0, 1)}</strong></>}<b>{result.score}% match</b></div><div className="discovery-card-body"><div className="card-title-row"><div><h3>{item.title}</h3><p>{item.release_year || "—"} · {item.genres || mediaLabel(item.media_type)}</p></div>{item.imdb_rating ? <strong className="imdb">IMDb {item.imdb_rating}</strong> : null}</div><p className="card-description">{item.description || "Selected from current public discovery data."}</p><div className="meta-pills">{item.public_rating ? <span>★ Rating {item.public_rating}</span> : null}{item.runtime && <span>⏱ {item.runtime}</span>}{item.ott_india && <span>▣ {item.ott_india}</span>}{isSeries && item.seasons ? <span>▤ {item.seasons} seasons</span> : null}{isSeries && item.episodes ? <span>• {item.episodes} episodes</span> : null}{isSeries && item.episode_duration ? <span>⌛ {item.episode_duration}</span> : null}{item.media_type === "game" && item.player_modes ? <span>◉ {item.player_modes}</span> : null}{item.media_type === "book" && item.author ? <span>✎ {item.author}</span> : null}{item.media_type === "book" && item.reading_length ? <span>⌛ {item.reading_length}</span> : null}</div>{item.languages && <p className="language-line">🌐 <strong>Languages:</strong> {item.languages}</p>}<p className="fit-reason">✦ {result.reasons?.[0] || "Matches your saved taste profile."}</p><div className="discovery-actions">{item.watch_url && item.ott_india && item.ott_india !== "Not available in India" && <a className="watch-button" href={item.watch_url} target="_blank" rel="noreferrer">▶ Watch / OTT ↗</a>}{item.source_url && <a className="details-button" href={item.source_url} target="_blank" rel="noreferrer">Details ↗</a>}</div>{item.source && <div className="source-line">Source: {item.source.toUpperCase()} · public data</div>}</div></article>;
-}
-
-function WebCard({ result }: { result: SearchResult }) { let host = result.url; try { host = new URL(result.url).hostname; } catch {} return <a className="search-result-card" href={result.url} target="_blank" rel="noreferrer"><small>{host}</small><h3>{result.title}</h3><p>{result.snippet || "Open this result."}</p></a>; }
+function DiscoveryCard({result}:{result:DiscoveryResult}){const i=result.item;const series=i.media_type==="tv"||i.media_type==="anime";return <article className="discovery-card"><div className="discovery-poster">{i.image_url?<img src={i.image_url} alt={`${i.title} poster`}/>:<strong>{i.title.slice(0,1)}</strong>}<b>{result.score}% match</b></div><div className="discovery-card-body"><div className="card-title-row"><div><h3>{i.title}</h3><p>{i.release_year||"—"} · {i.genres||i.media_type}</p></div>{i.imdb_rating?<strong className="imdb">IMDb {i.imdb_rating}</strong>:null}</div><p className="card-description">{i.description||"No synopsis available."}</p><div className="meta-pills">{i.public_rating?<span>★ {i.public_rating}</span>:null}{i.runtime?<span>⏱ {i.runtime}</span>:null}{i.ott_india?<span>▣ {i.ott_india}</span>:null}{series&&i.seasons?<span>▤ {i.seasons} seasons</span>:null}{series&&i.episodes?<span>• {i.episodes} episodes</span>:null}{series&&i.episode_duration?<span>⌛ {i.episode_duration}</span>:null}</div>{i.languages&&<p className="language-line">🌐 <strong>Languages:</strong> {i.languages}</p>}<p className="fit-reason">✦ {result.reasons?.[0]||"Matches your saved taste."}</p><div className="discovery-actions">{i.watch_url&&<a className="watch-button" href={i.watch_url} target="_blank" rel="noreferrer">▶ Where to watch ↗</a>}{i.trailer_url&&<a className="details-button" href={i.trailer_url} target="_blank" rel="noreferrer">Trailer ↗</a>}{i.source_url&&<a className="details-button" href={i.source_url} target="_blank" rel="noreferrer">Details ↗</a>}</div><div className="source-line">{i.source||"public"} · metadata checked live</div></div></article>}
