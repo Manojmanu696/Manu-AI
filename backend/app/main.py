@@ -12,13 +12,14 @@ from .models import MediaItem, Memory
 from .schemas import ChatRequest, ChatResponse, MediaCreate, MediaOut, MediaUpdate, MemoryCreate, MemoryOut, MemoryImportRequest, MemoryImportResponse, PersonalSnapshot
 from .services.ai import current_provider, retrieve_context
 from .services.memory_curator import curate_memory
+from .services.personal_intelligence import build_profile
 from .services.portability import build_zip, csv_text, db_size, export_payload, restore_payload, serialize_media, serialize_memory
 from .services.recommendations import recommendations
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine); yield
-app = FastAPI(title="Manu AI API", version="0.3.0", description="Local-first personal discovery dashboard API", lifespan=lifespan)
+app = FastAPI(title="Manu AI API", version="0.4.0", description="Local-first personal discovery dashboard API", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=ALLOWED_ORIGINS, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 @app.get("/health")
 def health(): return {"status":"ok","service":"manu-ai","local_first":True}
@@ -79,6 +80,8 @@ def curate_memories(payload: dict, db: Session = Depends(get_db)):
     text=str(payload.get("text","")).strip()
     if not text: raise HTTPException(400,"text is required")
     return curate_memory(db, text)
+@app.get("/profile")
+def personal_profile(db: Session = Depends(get_db)): return build_profile(db)
 @app.get("/memories/snapshot",response_model=PersonalSnapshot)
 def memory_snapshot(db:Session=Depends(get_db)):
     memories=db.query(Memory).order_by(Memory.created_at.asc()).all(); media=db.query(MediaItem).order_by(MediaItem.date_added.asc()).all()
@@ -87,6 +90,11 @@ def memory_snapshot(db:Session=Depends(get_db)):
     library=[serialize_media(i) for i in media]; watch=[x for x in library if x.get("status")=="want"]
     instructions="You are receiving a snapshot from Manu AI. Treat explicit/chatgpt_import memories as user-provided context, inferred memories as hypotheses, and library entries as raw interaction data. Do not invent preferences. Ask before changing important memories."
     return {"generated_at":datetime.now(timezone.utc),"explicit_memories":explicit,"inferred_memories":inferred,"library":library,"watchlist":watch,"instructions_for_chatgpt":instructions}
+@app.post("/demo/load")
+def add_demo(db:Session=Depends(get_db)): return {"loaded":load_demo(db)}
+@app.delete("/demo",status_code=204)
+def delete_demo(db:Session=Depends(get_db)):
+    db.query(MediaItem).filter_by(is_demo=True).delete(); db.query(Memory).filter_by(is_demo=True).delete(); db.commit()
 @app.get("/recommendations")
 def get_recommendations(media_type:str|None=None,limit:int=Query(12,ge=1,le=50),db:Session=Depends(get_db)):
     return [{"item":serialize_media(r["item"]),"score":r["score"],"reasons":r["reasons"]} for r in recommendations(db,media_type,limit)]
