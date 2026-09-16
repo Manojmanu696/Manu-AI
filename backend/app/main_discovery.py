@@ -18,8 +18,16 @@ def _bootstrap_discovery_data():
                 db.add(Memory(**memory, is_demo=False))
         if db.query(CatalogueItem).count() == 0:
             from .demo import DEMO_CATALOGUE
+            verified = {
+                "Memento": {"imdb_rating": 8.4, "ott_india": "Prime Video"},
+                "The Invisible Guest": {"imdb_rating": 8.0, "ott_india": "Not currently streaming in India"},
+                "Coherence": {"imdb_rating": 7.2, "ott_india": "Not currently streaming in India"},
+                "Prisoners": {"imdb_rating": 8.2, "ott_india": "Prime Video"},
+            }
             for item in DEMO_CATALOGUE:
-                db.add(CatalogueItem(**item, is_demo=True))
+                values = dict(item)
+                values.update(verified.get(values.get("title", ""), {}))
+                db.add(CatalogueItem(**values, is_demo=True))
         db.commit()
     finally:
         db.close()
