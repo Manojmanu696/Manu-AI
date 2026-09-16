@@ -1,8 +1,4 @@
 "use client";
 import { Icon } from "./icons";
-export const nav = [
-  ["home","Home"], ["discover","Discover"], ["movie","Movies"], ["anime","Anime"], ["tv","TV Shows"], ["game","Games"], ["book","Books"], ["memory","Memory"], ["data","Data"], ["ai","AI"], ["settings","Settings"]
-];
-export function Sidebar({ active, onNavigate }: {active:string; onNavigate:(page:string)=>void}) {
- return <aside className="sidebar"><div className="brand"><span className="brand-mark">M</span><span>Manu <i>AI</i></span></div><nav>{nav.map(([id,label], index) => <button key={id} onClick={()=>onNavigate(id)} className={`nav-item ${active===id?"active":""} ${index===7?"nav-split":""}`}><Icon name={id}/><span>{label}</span></button>)}</nav><div className="sidebar-bottom"><div className="private-dot"></div><span>Private & local</span></div></aside>
-}
+export const nav = [["home","Home"],["discover","Discover"],["movie","Movies"],["anime","Anime"],["tv","TV Shows"],["game","Games"],["book","Books"],["memory","Memory"],["data","Data"],["ai","AI"],["settings","Settings"]];
+export function Sidebar({active,onNavigate}:{active:string;onNavigate:(page:string)=>void}){return <aside className="sidebar"><div className="brand"><span className="brand-mark">M</span><span>Manu <i>AI</i></span></div><nav>{nav.map(([id,label],index)=><button key={id} onClick={()=>onNavigate(id)} className={`nav-item ${active===id?"active":""} ${index===7?"nav-split":""}`}><Icon name={id}/><span>{label}</span></button>)}<a className="nav-item bridge-link" href="/memory-bridge"><Icon name="memory"/><span>ChatGPT Bridge</span></a></nav><div className="sidebar-bottom"><div className="private-dot"/><span>Private & local</span></div></aside>}
