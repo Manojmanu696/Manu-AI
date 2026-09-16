@@ -28,6 +28,17 @@ def _bootstrap_discovery_data():
                 values = dict(item)
                 values.update(verified.get(values.get("title", ""), {}))
                 db.add(CatalogueItem(**values, is_demo=True))
+        verified = {
+            "Memento": {"imdb_rating": 8.4, "ott_india": "Prime Video"},
+            "The Invisible Guest": {"imdb_rating": 8.0, "ott_india": "Not currently streaming in India"},
+            "Coherence": {"imdb_rating": 7.2, "ott_india": "Not currently streaming in India"},
+            "Prisoners": {"imdb_rating": 8.2, "ott_india": "Prime Video"},
+        }
+        for title, metadata in verified.items():
+            existing = db.query(CatalogueItem).filter_by(title=title).first()
+            if existing:
+                if not existing.imdb_rating: existing.imdb_rating = metadata["imdb_rating"]
+                if not existing.ott_india: existing.ott_india = metadata["ott_india"]
         db.commit()
     finally:
         db.close()
