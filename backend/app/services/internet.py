@@ -1,217 +1,118 @@
-"""Provider-neutral, read-only internet research tools for Manu AI."""
+"""Read-only public web search/fetch providers for Manu AI."""
 from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from html import unescape
 from html.parser import HTMLParser
-import ipaddress
-import json
-import re
-import socket
+import ipaddress, json, re, socket
 from typing import Any
-from urllib.parse import parse_qs, quote_plus, unquote, urlparse
+from urllib.parse import parse_qs, quote_plus, unquote, urlencode, urlparse
 from urllib.request import Request, urlopen
 
-from ..config import WEB_REQUEST_TIMEOUT_SECONDS, WEB_SEARCH_PROVIDER
-
-USER_AGENT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/146 Safari/537.36 ManuAI/1.0"
-
+from ..config import BRAVE_API_KEY, SERPER_API_KEY, WEB_REQUEST_TIMEOUT_SECONDS, WEB_SEARCH_PROVIDER
+USER_AGENT="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 Chrome/146 Safari/537.36 ManuAI/1.0"
 
 @dataclass
 class SearchResult:
-    title: str
-    url: str
-    snippet: str = ""
-    provider: str = ""
-
-    def to_dict(self) -> dict[str, str]:
-        return asdict(self)
-
+    title:str; url:str; snippet:str=""; provider:str=""
+    def to_dict(self): return asdict(self)
 
 class WebSearchProvider(ABC):
     @abstractmethod
-    def search(self, query: str, limit: int = 5) -> list[SearchResult]: ...
+    def search(self,query:str,limit:int=8)->list[SearchResult]: ...
 
+def _safe(url:str)->bool:
+    try:
+        p=urlparse(url)
+        if p.scheme not in {"http","https"} or not p.hostname or p.username or p.password:return False
+        if p.hostname.lower() in {"localhost","localhost.localdomain"}:return False
+        for addr in socket.getaddrinfo(p.hostname,None,type=socket.SOCK_STREAM):
+            ip=ipaddress.ip_address(addr[4][0])
+            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:return False
+        return True
+    except (OSError,ValueError):return False
 
-class _DuckDuckGoParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.results: list[SearchResult] = []
-        self._url = ""
-        self._title: list[str] = []
-        self._snippet: list[str] = []
-        self._in_result = False
-        self._in_snippet = False
+def _http(url:str,method="GET",data:bytes|None=None,headers:dict[str,str]|None=None)->str:
+    h={"User-Agent":USER_AGENT,"Accept":"text/html,application/xhtml+xml,application/json","Accept-Language":"en-IN,en;q=0.9"};h.update(headers or {})
+    with urlopen(Request(url,data=data,method=method,headers=h),timeout=WEB_REQUEST_TIMEOUT_SECONDS) as response:
+        return response.read(2_000_000).decode(response.headers.get_content_charset() or "utf-8",errors="replace")
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
-        attrs_dict = dict(attrs)
-        classes = attrs_dict.get("class", "") or ""
-        if tag == "a" and ("result__a" in classes or "result-link" in classes):
-            raw_url = attrs_dict.get("href", "") or ""
-            parsed = urlparse(raw_url)
-            redirect = parse_qs(parsed.query).get("uddg", [""])[0]
-            self._url = unquote(redirect or raw_url)
-            self._title, self._snippet = [], []
-            self._in_result = True
-        elif self._in_result and ("result__snippet" in classes or "result-snippet" in classes):
-            self._in_snippet = True
-
-    def handle_data(self, data: str):
-        if self._in_result:
-            (self._snippet if self._in_snippet else self._title).append(data)
-
-    def handle_endtag(self, tag: str):
-        if tag == "a" and self._in_result:
-            title = " ".join(self._title).strip()
-            if title and _is_safe_public_url(self._url):
-                self.results.append(SearchResult(title=unescape(title), url=self._url, snippet=unescape(" ".join(self._snippet).strip()), provider="duckduckgo"))
-            self._in_result = False
-            self._in_snippet = False
-        elif self._in_snippet and tag in {"a", "div", "span"}:
-            self._in_snippet = False
-
-
-class _BingParser(HTMLParser):
-    def __init__(self):
-        super().__init__()
-        self.results: list[SearchResult] = []
-        self._url = ""
-        self._title: list[str] = []
-        self._snippet: list[str] = []
-        self._in_title = False
-        self._in_snippet = False
-
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]):
-        a = dict(attrs)
-        classes = a.get("class", "") or ""
-        if tag == "li" and "b_algo" in classes:
-            self._url, self._title, self._snippet = "", [], []
-        elif tag == "a" and not self._url and a.get("href", "").startswith(("http://", "https://")):
-            self._url = a.get("href", "") or ""
-            self._in_title = True
-        elif "b_caption" in classes:
-            self._in_snippet = True
-
-    def handle_data(self, data: str):
-        if self._in_title: self._title.append(data)
-        if self._in_snippet: self._snippet.append(data)
-
-    def handle_endtag(self, tag: str):
-        if tag == "a" and self._in_title:
-            self._in_title = False
-        if tag in {"p", "div"} and self._in_snippet:
-            self._in_snippet = False
-        if tag == "li" and self._url:
-            title = " ".join(self._title).strip()
-            if title and _is_safe_public_url(self._url):
-                self.results.append(SearchResult(title=unescape(title), url=self._url, snippet=unescape(" ".join(self._snippet).strip()), provider="bing"))
-            self._url = ""
-
-
-class DuckDuckGoHtmlSearchProvider(WebSearchProvider):
-    """No-key public search with several read-only fallbacks."""
-    endpoints = (
-        "https://html.duckduckgo.com/html/",
-        "https://lite.duckduckgo.com/lite/",
-        "https://www.google.com/search",
-    )
-
-    def _request(self, url: str, method: str = "GET", data: bytes | None = None) -> str:
-        headers = {"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml", "Accept-Language": "en-IN,en;q=0.9"}
-        if method == "POST": headers["Content-Type"] = "application/x-www-form-urlencoded"
-        request = Request(url, data=data, method=method, headers=headers)
-        with urlopen(request, timeout=WEB_REQUEST_TIMEOUT_SECONDS) as response:
-            return response.read(1_000_000).decode(response.headers.get_content_charset() or "utf-8", errors="replace")
-
-    def search(self, query: str, limit: int = 5) -> list[SearchResult]:
-        if not query.strip(): return []
-        encoded = quote_plus(query[:500])
-        failures: list[str] = []
-        for endpoint, method in ((self.endpoints[0], "POST"), (self.endpoints[0] + "?q=" + encoded, "GET"), (self.endpoints[1] + "?q=" + encoded, "GET"), (self.endpoints[2] + "?q=" + encoded + "&hl=en&gl=in", "GET")):
-            try:
-                data = f"q={encoded}&kl=in-en&kp=-1".encode() if method == "POST" else None
-                html = self._request(endpoint, method, data)
-                parser = _DuckDuckGoParser() if "duckduckgo" in endpoint else _BingParser() if "bing" in endpoint else _GoogleParser()
-                parser.feed(html)
-                if parser.results: return parser.results[:limit]
-                failures.append(f"{endpoint}: empty")
-            except Exception as exc:
-                failures.append(f"{endpoint}: {type(exc).__name__}")
-        raise RuntimeError("All public search providers failed: " + "; ".join(failures))
-
-
-class _GoogleParser(HTMLParser):
-    def __init__(self):
-        super().__init__(); self.results=[]; self.url=""; self.title=[]; self.capture=False
-    def handle_starttag(self, tag, attrs):
-        a=dict(attrs)
-        if tag=="a" and a.get("href","").startswith("http") and not any(x in a.get("href","") for x in ("google.com/search", "google.com/url")):
-            self.url=a.get("href",""); self.title=[]; self.capture=True
-    def handle_data(self, data):
-        if self.capture: self.title.append(data)
-    def handle_endtag(self, tag):
-        if tag=="a" and self.capture:
+class DuckParser(HTMLParser):
+    def __init__(self):super().__init__();self.results=[];self.url="";self.title=[];self.snippet=[];self.in_title=False;self.in_snippet=False
+    def handle_starttag(self,tag,attrs):
+        a=dict(attrs);c=a.get("class","") or ""
+        if tag=="a" and "result__a" in c:
+            raw=a.get("href","") or "";p=urlparse(raw);self.url=unquote(parse_qs(p.query).get("uddg",[raw])[0]);self.title=[];self.snippet=[];self.in_title=True
+        elif "result__snippet" in c:self.in_snippet=True
+    def handle_data(self,d):
+        if self.in_title:self.title.append(d)
+        if self.in_snippet:self.snippet.append(d)
+    def handle_endtag(self,tag):
+        if tag=="a" and self.in_title:
             title=" ".join(self.title).strip()
-            if title and self.url and _is_safe_public_url(self.url): self.results.append(SearchResult(title=unescape(title), url=self.url, provider="google"))
-            self.capture=False
+            if title and _safe(self.url):self.results.append(SearchResult(unescape(title),self.url,unescape(" ".join(self.snippet).strip()),"duckduckgo"))
+            self.in_title=False
+        if self.in_snippet and tag in {"div","span"}:self.in_snippet=False
 
+class DuckDuckGoSearch(WebSearchProvider):
+    def search(self,query,limit=8):
+        q=quote_plus(query[:500]);fails=[]
+        for url,method,data in [("https://html.duckduckgo.com/html/","POST",f"q={q}&kl=in-en&kp=-1".encode()),(f"https://html.duckduckgo.com/html/?q={q}","GET",None),(f"https://lite.duckduckgo.com/lite/?q={q}","GET",None)]:
+            try:
+                html=_http(url,method,data,{"Content-Type":"application/x-www-form-urlencoded"} if method=="POST" else None);p=DuckParser();p.feed(html)
+                if p.results:return p.results[:limit]
+                fails.append(f"{url}: empty")
+            except Exception as e:fails.append(f"{url}: {type(e).__name__}")
+        raise RuntimeError("DuckDuckGo search unavailable: "+"; ".join(fails))
+
+class BraveSearch(WebSearchProvider):
+    def search(self,query,limit=8):
+        if not BRAVE_API_KEY:raise RuntimeError("BRAVE_API_KEY is not configured")
+        raw=_http("https://api.search.brave.com/res/v1/web/search?"+urlencode({"q":query[:500],"count":limit}),headers={"Accept":"application/json","X-Subscription-Token":BRAVE_API_KEY});data=json.loads(raw);out=[]
+        for r in (data.get("web",{}).get("results") or [])[:limit]:
+            u=r.get("url","");t=r.get("title","")
+            if t and _safe(u):out.append(SearchResult(t,u,r.get("description","") or "","brave"))
+        return out
+
+class SerperSearch(WebSearchProvider):
+    def search(self,query,limit=8):
+        if not SERPER_API_KEY:raise RuntimeError("SERPER_API_KEY is not configured")
+        raw=_http("https://google.serper.dev/search","POST",json.dumps({"q":query[:500],"gl":"in","hl":"en","num":limit}).encode(),{"Content-Type":"application/json","X-API-KEY":SERPER_API_KEY});data=json.loads(raw);out=[]
+        for r in (data.get("organic") or [])[:limit]:
+            u=r.get("link","");t=r.get("title","")
+            if t and _safe(u):out.append(SearchResult(t,u,r.get("snippet","") or "","google"))
+        return out
+
+def current_search_provider()->WebSearchProvider:
+    name=(WEB_SEARCH_PROVIDER or "auto").lower()
+    if name in {"brave","brave_search"}:return BraveSearch()
+    if name in {"serper","google"}:return SerperSearch()
+    if name in {"duckduckgo_html","public_html"}:return DuckDuckGoSearch()
+    if BRAVE_API_KEY:return BraveSearch()
+    if SERPER_API_KEY:return SerperSearch()
+    return DuckDuckGoSearch()
 
 class WebFetchTool:
-    """Read-only public-page fetcher with basic SSRF protection and text extraction."""
-    def fetch(self, url: str) -> dict[str, Any]:
-        if not _is_safe_public_url(url): raise ValueError("Only public http(s) URLs may be fetched.")
-        request = Request(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml,text/plain"})
-        with urlopen(request, timeout=WEB_REQUEST_TIMEOUT_SECONDS) as response:
-            content_type = response.headers.get_content_type(); raw = response.read(600_000)
-            text = raw.decode(response.headers.get_content_charset() or "utf-8", errors="replace")
-        if content_type in {"text/html", "application/xhtml+xml"}:
-            title = _first_match(r"<title[^>]*>(.*?)</title>", text)
-            text = re.sub(r"<script[^>]*>.*?</script>|<style[^>]*>.*?</style>", " ", text, flags=re.I | re.S)
-            text = unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", text))).strip()
-        else: title = ""
-        return {"url": url, "title": title[:300], "content_type": content_type, "text": text[:30_000]}
-
+    def fetch(self,url:str)->dict[str,Any]:
+        if not _safe(url):raise ValueError("Only public http(s) URLs may be fetched.")
+        with urlopen(Request(url,headers={"User-Agent":USER_AGENT,"Accept":"text/html,application/xhtml+xml,text/plain"}),timeout=WEB_REQUEST_TIMEOUT_SECONDS) as response:
+            ct=response.headers.get_content_type();text=response.read(800_000).decode(response.headers.get_content_charset() or "utf-8",errors="replace")
+        title=""
+        if ct in {"text/html","application/xhtml+xml"}:
+            m=re.search(r"<title[^>]*>(.*?)</title>",text,re.I|re.S);title=unescape(re.sub(r"\s+"," ",re.sub(r"<[^>]+>"," ",m.group(1))).strip()) if m else ""
+            text=re.sub(r"<script[^>]*>.*?</script>|<style[^>]*>.*?</style>"," ",text,flags=re.I|re.S);text=unescape(re.sub(r"\s+"," ",re.sub(r"<[^>]+>"," ",text))).strip()
+        return {"url":url,"title":title[:300],"content_type":ct,"text":text[:30000]}
 
 class ReadOnlyBrowserTool:
-    name = "read_only_browser"; supports_automation = False
-    def __init__(self, fetcher: WebFetchTool | None = None): self.fetcher = fetcher or WebFetchTool()
-    def open_and_read(self, url: str) -> dict[str, Any]: return self.fetcher.fetch(url)
-    def status(self) -> dict[str, Any]: return {"mode": "read-only HTTP browser", "supports_automation": False, "destructive_actions": "not available"}
+    name="read_only_browser";supports_automation=False
+    def __init__(self,fetcher=None):self.fetcher=fetcher or WebFetchTool()
+    def open_and_read(self,url):return self.fetcher.fetch(url)
+    def status(self):return {"mode":"read-only HTTP browser","supports_automation":False,"destructive_actions":"not available"}
 
+def tool_definitions():
+    return [{"type":"function","function":{"name":"web_search","description":"Search the public web for current factual discovery information.","parameters":{"type":"object","properties":{"query":{"type":"string"}},"required":["query"]}}},{"type":"function","function":{"name":"web_fetch","description":"Read a public web page returned by search. Read-only.","parameters":{"type":"object","properties":{"url":{"type":"string"}},"required":["url"]}}}]
 
-def _first_match(pattern: str, text: str) -> str:
-    match = re.search(pattern, text, flags=re.I | re.S)
-    return unescape(re.sub(r"\s+", " ", match.group(1)).strip()) if match else ""
-
-
-def _is_safe_public_url(url: str) -> bool:
-    try:
-        parsed = urlparse(url)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password: return False
-        if parsed.hostname.lower() in {"localhost", "localhost.localdomain"}: return False
-        for address in socket.getaddrinfo(parsed.hostname, None, type=socket.SOCK_STREAM):
-            ip = ipaddress.ip_address(address[4][0])
-            if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved: return False
-        return True
-    except (OSError, ValueError): return False
-
-
-def current_search_provider() -> WebSearchProvider:
-    if WEB_SEARCH_PROVIDER in {"duckduckgo_html", "public_html"}: return DuckDuckGoHtmlSearchProvider()
-    raise RuntimeError(f"Unsupported web search provider: {WEB_SEARCH_PROVIDER}")
-
-
-def tool_definitions() -> list[dict[str, Any]]:
-    return [
-        {"type": "function", "function": {"name": "web_search", "description": "Search the public web for current factual discovery information. Never use this for private data.", "parameters": {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]}}},
-        {"type": "function", "function": {"name": "web_fetch", "description": "Fetch and read a public web page returned by search. Read-only: it cannot log in, submit forms, purchase, or change accounts.", "parameters": {"type": "object", "properties": {"url": {"type": "string"}}, "required": ["url"]}}},
-    ]
-
-
-def execute_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
-    if name == "web_search":
-        query = str(arguments.get("query", ""))[:500]
-        return {"results": [result.to_dict() for result in current_search_provider().search(query)]}
-    if name == "web_fetch": return WebFetchTool().fetch(str(arguments.get("url", "")))
-    return {"error": f"Unknown or blocked tool: {name}"}
+def execute_tool(name,arguments):
+    if name=="web_search":return {"results":[r.to_dict() for r in current_search_provider().search(str(arguments.get("query",""))[:500])]}
+    if name=="web_fetch":return WebFetchTool().fetch(str(arguments.get("url","")))
+    return {"error":f"Unknown or blocked tool: {name}"}
