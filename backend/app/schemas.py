@@ -70,3 +70,46 @@ class ChatResponse(BaseModel):
     recommendations: list[dict]
     assumptions: list[str]
 
+
+class CatalogueOut(BaseModel):
+    id: int
+    media_type: str
+    title: str
+    description: str
+    genres: str
+    tags: str
+    release_year: int | None
+    image_url: str
+    external_url: str
+    imdb_rating: float | None
+    public_rating: float | None
+    runtime: str
+    intensity: str
+    ending_type: str
+    ott_india: str
+    seasons: int | None
+    episodes: int | None
+    episode_duration: str
+    author: str
+    page_count: int | None
+    reading_length: str
+    gameplay_style: str
+    story_focus: str
+    player_modes: str
+    difficulty: str
+    source_url: str
+    source_retrieved_at: datetime | None
+    is_demo: bool
+    model_config = {"from_attributes": True}
+
+
+class FeedbackCreate(BaseModel):
+    action: str = Field(pattern="^(like|not_for_me|watchlist|watched)$")
+
+
+class InternetQuery(BaseModel):
+    query: str = Field(min_length=2, max_length=500)
+
+
+class InternetFetch(BaseModel):
+    url: str = Field(min_length=8, max_length=2000)
