@@ -1,7 +1,7 @@
 /* Manu AI — refined search surface */
 .search-experience{
   --ink:#171824;--muted:#777987;--line:rgba(36,35,58,.10);--violet:#7357f6;--violet-2:#a595ff;
-  left:0;padding:24px clamp(22px,5vw,76px) 22px;
+  left:246px;padding:24px clamp(22px,5vw,76px) 22px;
   background:radial-gradient(ellipse at 50% -15%,rgba(181,166,255,.38),transparent 43%),radial-gradient(ellipse at 100% 70%,rgba(222,214,255,.27),transparent 34%),#f8f8fc;
   color:var(--ink);isolation:isolate
 }
