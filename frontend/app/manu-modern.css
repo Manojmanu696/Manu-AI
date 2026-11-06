@@ -69,7 +69,7 @@
 .search-error{border-radius:14px;box-shadow:0 8px 24px #822d2d0a}
 .search-footer{border-color:#e9e6f0;color:#9998a5;margin-top:58px}
 @keyframes manu-rise{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:translateY(0)}}
-@media(max-width:900px){.search-experience{padding:18px 24px}.search-hero{margin-top:11vh}.search-content,.discovery-content{margin-top:48px}}
+@media(max-width:900px){.search-experience{left:0;padding:18px 24px}.search-hero{margin-top:11vh}.search-content,.discovery-content{margin-top:48px}}
 @media(max-width:600px){
  .search-experience{padding:14px 16px}
  .search-topbar{height:38px}
