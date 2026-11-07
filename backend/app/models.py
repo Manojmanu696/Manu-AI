@@ -69,6 +69,25 @@ class CatalogueItem(Base):
     difficulty: Mapped[str] = mapped_column(String(80), default="")
     source_url: Mapped[str] = mapped_column(String(1000), default="")
     source_retrieved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    source_provider: Mapped[str] = mapped_column(String(40), default="local")
+    provider_id: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    backdrop_url: Mapped[str] = mapped_column(String(1000), default="")
+    original_language: Mapped[str] = mapped_column(String(12), default="")
+    vote_count: Mapped[int] = mapped_column(Integer, default=0)
+    popularity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trailer_url: Mapped[str] = mapped_column(String(1000), default="")
+    watch_url: Mapped[str] = mapped_column(String(1000), default="")
+    watch_providers_json: Mapped[str] = mapped_column(Text, default="[]")
+    credits_json: Mapped[str] = mapped_column(Text, default="{}")
+    genre_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    series_status: Mapped[str] = mapped_column(String(40), default="")
+    runtime_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    original_title: Mapped[str] = mapped_column(String(300), default="")
+    details_fetched_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    similar_catalogue_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    episode_details_json: Mapped[str] = mapped_column(Text, default="[]")
+    schedule_json: Mapped[str] = mapped_column(Text, default="{}")
+    countries_json: Mapped[str] = mapped_column(Text, default="[]")
     is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
@@ -78,7 +97,51 @@ class RecommendationFeedback(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     catalogue_item_id: Mapped[int] = mapped_column(ForeignKey("catalogue_items.id"), index=True)
     action: Mapped[str] = mapped_column(String(30), index=True)
+    reason: Mapped[str] = mapped_column(String(40), default="")
+    context: Mapped[str] = mapped_column(String(80), default="")
+    rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    undone: Mapped[bool] = mapped_column(Boolean, default=False)
+    library_item_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    library_item_created: Mapped[bool] = mapped_column(Boolean, default=False)
+    previous_library_state_json: Mapped[str] = mapped_column(Text, default="{}")
+    taste_signal_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
+class DiscoverySectionCache(Base):
+    __tablename__ = "discovery_section_cache"
+    section_key: Mapped[str] = mapped_column(String(80), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(40), index=True)
+    catalogue_ids_json: Mapped[str] = mapped_column(Text, default="[]")
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    last_error: Mapped[str] = mapped_column(String(500), default="")
+
+
+class TasteSignal(Base):
+    __tablename__ = "taste_signals"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    dimension: Mapped[str] = mapped_column(String(80), index=True)
+    value: Mapped[str] = mapped_column(String(200), index=True)
+    direction: Mapped[str] = mapped_column(String(12), default="positive")
+    strength: Mapped[float] = mapped_column(Float, default=0.5)
+    confidence: Mapped[float] = mapped_column(Float, default=1.0)
+    source: Mapped[str] = mapped_column(String(20), default="explicit")
+    evidence: Mapped[str] = mapped_column(String(500), default="")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
+
+
+class TasteEmbedding(Base):
+    __tablename__ = "taste_embeddings"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    entity_key: Mapped[str] = mapped_column(String(200), unique=True, index=True)
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    model_name: Mapped[str] = mapped_column(String(120), default="")
+    vector_json: Mapped[str] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class ResearchSource(Base):

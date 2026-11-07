@@ -39,8 +39,31 @@ class CatalogueOut(BaseModel):
     intensity: str; ending_type: str; ott_india: str; seasons: int | None; episodes: int | None
     episode_duration: str; author: str; page_count: int | None; reading_length: str; gameplay_style: str
     story_focus: str; player_modes: str; difficulty: str; source_url: str; source_retrieved_at: datetime | None
+    source_provider: str = "local"; provider_id: str | None = None; backdrop_url: str = ""; original_language: str = ""
+    vote_count: int = 0; popularity: float | None = None; trailer_url: str = ""; watch_url: str = ""
+    watch_providers_json: str = "[]"; credits_json: str = "{}"; genre_ids_json: str = "[]"; series_status: str = ""
+    runtime_minutes: int | None = None; original_title: str = ""
+    details_fetched_at: datetime | None = None
+    similar_catalogue_ids_json: str = "[]"; episode_details_json: str = "[]"; schedule_json: str = "{}"
     is_demo: bool; model_config = {"from_attributes": True}
-class FeedbackCreate(BaseModel): action: str = Field(pattern="^(like|not_for_me|watchlist|watched)$")
+class FeedbackCreate(BaseModel):
+    action: str = Field(pattern="^(love|like|not_interested|not_for_me|already_watched|watchlist|started|completed|dropped|rate)$")
+    reason: str = Field(default="", pattern="^(|too_slow|too_emotional|predictable|wrong_genre|poor_writing|already_watched|mood)$")
+    context: str = Field(default="", max_length=80)
+    rating: int | None = Field(default=None, ge=1, le=10)
+
+class TasteSignalCreate(BaseModel):
+    dimension: str = Field(min_length=1, max_length=80)
+    value: str = Field(min_length=1, max_length=200)
+    direction: str = Field(default="positive", pattern="^(positive|negative)$")
+    strength: float = Field(default=0.5, ge=0, le=1)
+    confidence: float = Field(default=1, ge=0, le=1)
+    source: str = Field(default="explicit", pattern="^(explicit|inferred)$")
+    evidence: str = Field(default="", max_length=500)
+
+class TasteSignalOut(TasteSignalCreate):
+    id: int; confirmed_at: datetime | None; created_at: datetime
+    model_config = {"from_attributes": True}
 class InternetQuery(BaseModel): query: str = Field(min_length=2, max_length=500)
 class InternetFetch(BaseModel): url: str = Field(min_length=8, max_length=2000)
 

@@ -26,8 +26,9 @@ def _tokens(value: str | None) -> set[str]:
 def _taste(db: Session):
     history = db.query(MediaItem).all()
     memories = db.query(Memory).all()
-    liked = [x for x in history if (x.personal_rating or 0) >= 8 or x.sentiment == "like" or x.status == "completed"]
-    disliked = [x for x in history if (x.personal_rating or 0) <= 5 or x.sentiment == "dislike" or x.status == "dropped"]
+    # Completion and dropping are watch-history states, not inferred opinions.
+    liked = [x for x in history if x.personal_rating is not None and x.personal_rating >= 8] + [x for x in history if x.personal_rating is None and x.sentiment == "like"]
+    disliked = [x for x in history if x.personal_rating is not None and x.personal_rating <= 4] + [x for x in history if x.personal_rating is None and x.sentiment == "dislike"]
     liked_genres = Counter(g for x in liked for g in _terms(x.genres))
     liked_tags = Counter(t for x in liked for t in _terms(x.tags))
     disliked_genres = Counter(g for x in disliked for g in _terms(x.genres))
@@ -40,7 +41,7 @@ def score_catalogue_item(db: Session, candidate: CatalogueItem) -> tuple[int, li
     score = 50
     reasons: list[str] = []
     genres, tags = _terms(candidate.genres), _terms(candidate.tags)
-    genre_hits, tag_hits, avoid_hits = genres & set(liked_genres), tags & set(liked_tags), genres & set(disliked_genres)
+    genre_hits, tag_hits, avoid_hits = genres & set(liked_genres), tags & set(liked_tags), genres & {g for g, count in disliked_genres.items() if count >= 2}
     if genre_hits:
         score += min(24, 6 * sum(liked_genres[g] for g in genre_hits))
         reasons.append(f"Matches genres you repeatedly enjoy: {', '.join(sorted(genre_hits)[:3])}")
@@ -101,7 +102,7 @@ def _public_score(db: Session, item: dict) -> tuple[int, list[str]]:
     score = 55
     reasons: list[str] = []
     hits = genres & set(liked_genres)
-    avoid = genres & set(disliked_genres)
+    avoid = genres & {g for g, count in disliked_genres.items() if count >= 2}
     if hits:
         score += min(25, 6 * sum(liked_genres[g] for g in hits))
         reasons.append(f"Matches genres you repeatedly enjoy: {', '.join(sorted(hits)[:3])}")
@@ -135,53 +136,45 @@ def _tmdb_discover(db: Session, media_type: str, query: str | None, limit: int) 
     except Exception:
         return []
 
+    from .providers import _tmdb_rows, _GENRES, _tmdb
+    genre_map = _GENRES.get(kind)
+    if genre_map is None:
+        try: genre_map = {x["id"]: x["name"] for x in _tmdb(f"/genre/{kind}/list").get("genres", [])}
+        except Exception: genre_map = {}
     output: list[dict] = []
-    for row in candidates:
+    for item in _tmdb_rows(kind, candidates, genre_map, "search"):
         try:
-            tmdb_id = int(row["id"])
-            detail = _tmdb_get(f"/{kind}/{tmdb_id}")
-            title = detail.get("title") or detail.get("name") or row.get("title") or row.get("name") or "Untitled"
-            genres = ", ".join(g.get("name", "") for g in detail.get("genres", []) if g.get("name"))
-            if is_anime and "Animation" not in genres: genres = f"Animation, {genres}" if genres else "Animation"
-            languages = ", ".join(x.get("english_name", x.get("iso_639_1", "")) for x in detail.get("spoken_languages", []) if x.get("english_name") or x.get("iso_639_1"))
-            runtime = detail.get("runtime")
-            if runtime: runtime = f"{runtime} min"
-            elif detail.get("episode_run_time"): runtime = f"{detail['episode_run_time'][0]} min/episode"
-            provider_names, watch_url = _tmdb_providers(kind, tmdb_id)
-            item = {
-                "id": -tmdb_id,
-                "media_type": media_type,
-                "title": title,
-                "description": detail.get("overview") or row.get("overview") or "",
-                "genres": genres,
-                "tags": "public-web",
-                "release_year": int((detail.get("release_date") or detail.get("first_air_date") or "0000")[:4]) or None,
-                "image_url": f"https://image.tmdb.org/t/p/w500{detail.get('poster_path') or row.get('poster_path')}" if (detail.get("poster_path") or row.get("poster_path")) else "",
-                "external_id": f"tmdb:{tmdb_id}",
-                "external_url": f"https://www.themoviedb.org/{kind}/{tmdb_id}",
-                "imdb_rating": round(float(detail.get("vote_average")), 1) if detail.get("vote_average") else None,
-                "public_rating": round(float(detail.get("vote_average")), 1) if detail.get("vote_average") else None,
-                "runtime": runtime or "",
-                "ott_india": provider_names or "Not available in India",
-                "seasons": detail.get("number_of_seasons") if kind == "tv" else None,
-                "episodes": detail.get("number_of_episodes") if kind == "tv" else None,
-                "episode_duration": runtime or "",
-                "languages": languages,
-                "watch_url": watch_url or f"https://www.themoviedb.org/{kind}/{tmdb_id}/watch",
-                "source_url": f"https://www.themoviedb.org/{kind}/{tmdb_id}",
-                "source": "tmdb",
-                "source_retrieved_at": datetime.now(timezone.utc).isoformat(),
-            }
+            if is_anime and "Animation" not in item["genres"]: item["genres"] = f"Animation, {item['genres']}".strip(", ")
+            item["ott_india"] = ""
+            item["watch_url"] = f"https://www.themoviedb.org/{kind}/{item['provider_id']}/watch"
+            item["languages"] = item.get("original_language", "")
             score, reasons = _public_score(db, item)
-            output.append({"item": item, "score": score, "reasons": reasons, "source": "public_tmdb"})
+            output.append({"item": item, "score": score, "fit": _fit_label(score), "reasons": reasons, "source": "public_tmdb"})
         except Exception:
             continue
     return sorted(output, key=lambda x: x["score"], reverse=True)[:limit]
 
 
+def _fit_label(score: float) -> str:
+    if score >= 74: return "Excellent fit"
+    if score >= 63: return "Strong match"
+    if score >= 52: return "Good fit"
+    return "Explore"
+
+
 def discover(db: Session, media_type: str | None = None, limit: int = 24, query: str | None = None) -> list[dict]:
     public_types = {"movie", "tv", "anime"}
     public_rows = _tmdb_discover(db, media_type, query, limit) if media_type in public_types else []
+    if query and media_type in {"tv", "anime"}:
+        from .providers import AniListProvider, TVMazeProvider
+        provider = AniListProvider() if media_type == "anime" else TVMazeProvider()
+        try:
+            for item in provider.search(query, limit):
+                score, reasons = _public_score(db, item)
+                public_rows.append({"item": item, "score": score, "fit": _fit_label(score), "reasons": reasons, "source": item["source_provider"]})
+        except Exception:
+            # Live search can fail independently; the local cache remains usable.
+            pass
     q = db.query(CatalogueItem)
     if media_type: q = q.filter(CatalogueItem.media_type == media_type)
     rows = q.all()
@@ -195,7 +188,15 @@ def discover(db: Session, media_type: str | None = None, limit: int = 24, query:
         score, reasons = score_catalogue_item(db, item)
         ranked.append({"item": item, "score": score, "reasons": reasons, "source": "local_catalogue"})
     # Public results win when available; local candidates remain a fallback/context source.
-    return sorted(ranked, key=lambda x: x["score"], reverse=True)[:limit]
+    deduplicated = {}
+    for result in sorted(ranked, key=lambda x: x["score"], reverse=True):
+        item = result["item"]
+        if isinstance(item, dict):
+            title, year, kind = item.get("title", ""), item.get("release_year"), item.get("media_type")
+        else:
+            title, year, kind = item.title, item.release_year, item.media_type
+        deduplicated.setdefault((kind, (title or "").strip().casefold(), year), result)
+    return list(deduplicated.values())[:limit]
 
 
 def web_discover(query: str, limit: int = 8) -> list[dict]:
