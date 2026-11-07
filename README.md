@@ -91,3 +91,9 @@ Common fixes:
 - **A title has no availability listing:** TMDB has no India provider record for it; Manu does not infer availability from other services.
 - **The browser cannot reach the API:** keep `./start.sh` running and confirm `NEXT_PUBLIC_API_URL` points to `http://localhost:8000` if overridden.
 - **Port is in use:** stop the process using 3000/8000 or configure the launch script.
+
+## Immersive cinema and CI
+
+The featured recommendation uses a dynamically imported Three.js composition with lightweight generated artwork, bounded device pixel ratio, pointer parallax, and disposal on unmount. The title controls remain accessible HTML. Reduced-motion preferences stop camera movement; browsers without WebGL receive a CSS fallback. The canvas does not delay catalogue loading.
+
+Pull requests and feature pushes run `.github/workflows/quality.yml`: backend tests, frontend lint and TypeScript checks, production build, dependency audit, and Playwright browser checks. Run the same checks locally with the commands above.
