@@ -20,6 +20,10 @@ free_port() {
 
 API_PORT="$(free_port 8000)"
 WEB_PORT="$(free_port 3000)"
+# NEXT_PUBLIC_API_URL is compiled into the browser bundle. Clear only the
+# generated Next.js cache so a previously selected dynamic API port cannot
+# survive into a new launch.
+rm -rf frontend/.next
 cleanup() { kill "${API_PID:-}" "${WEB_PID:-}" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 

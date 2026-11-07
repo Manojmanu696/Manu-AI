@@ -5,7 +5,7 @@ import * as THREE from "three";
 
 /** A compact, self-contained Three.js composition. The canvas is decorative;
  * title actions stay in normal DOM for keyboard and screen-reader access. */
-export default function ThreeCinema({ title }: { title: string }) {
+export default function ThreeCinema({ title, artwork = [] }: { title: string; artwork?: (string | undefined)[] }) {
   const mount = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const host = mount.current;
@@ -39,6 +39,17 @@ export default function ThreeCinema({ title }: { title: string }) {
       return mesh;
     };
     const cards = [makePoster(title, 38), makePoster("Curated stories", 214), makePoster("After dark", 173)];
+    const loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
+    const textures: THREE.Texture[] = [];
+    artwork.filter((url): url is string => Boolean(url && /^https:\/\//.test(url))).slice(0, 2).forEach((url, index) => {
+      const textureUrl = `/api/artwork?src=${encodeURIComponent(url)}`;
+      loader.load(textureUrl, texture => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        textures.push(texture);
+        const material = cards[index].material as THREE.MeshPhysicalMaterial;
+        const old = material.map; material.map = texture; material.needsUpdate = true; old?.dispose();
+      }, undefined, () => undefined);
+    });
     cards.forEach((card, i) => { card.position.set((i - 1) * 1.55, i === 1 ? .18 : -.12, -Math.abs(i - 1) * .7); card.rotation.y = (i - 1) * -.13; scene.add(card); });
     const resize = () => { if (!host.clientWidth) return; camera.aspect = host.clientWidth / host.clientHeight; camera.updateProjectionMatrix(); renderer.setSize(host.clientWidth, host.clientHeight); };
     const observer = new ResizeObserver(resize); observer.observe(host);
@@ -47,7 +58,7 @@ export default function ThreeCinema({ title }: { title: string }) {
     window.addEventListener("pointermove", onMove, { passive: true });
     const draw = () => { frame = requestAnimationFrame(draw); if (!reduce) { camera.position.x += (pointerX - camera.position.x) * .025; cards.forEach((c, i) => { c.position.y = (i === 1 ? .18 : -.12) + Math.sin(Date.now() * .0005 + i) * .045; }); } renderer.render(scene, camera); };
     draw();
-    return () => { cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("pointermove", onMove); cards.forEach(c => { (c.material as THREE.Material).dispose(); c.geometry.dispose(); }); renderer.dispose(); host.replaceChildren(); };
-  }, [title]);
+    return () => { cancelAnimationFrame(frame); observer.disconnect(); window.removeEventListener("pointermove", onMove); cards.forEach(c => { (c.material as THREE.Material).dispose(); c.geometry.dispose(); }); textures.forEach(texture => texture.dispose()); renderer.dispose(); host.replaceChildren(); };
+  }, [title, artwork]);
   return <div className="three-cinema" ref={mount} aria-hidden="true" />;
 }
