@@ -1,0 +1,14 @@
+.data-tools-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
+.data-tool{border:1px solid var(--line);background:var(--panel);padding:22px}
+.data-tool h2{font-size:18px;margin:8px 0}
+.data-tool>p:not(.eyebrow){max-width:520px;color:#969dad;font-size:13px;line-height:1.55}
+.data-tool-actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:19px}
+.data-tool .primary-button,.data-tool .secondary-button{font-size:12px;padding:10px 13px}
+.data-tool button:disabled{opacity:.55;cursor:wait}
+.replace-choice{display:flex;gap:9px;align-items:center;margin:18px 0;color:#c7c8cc;font-size:12px}
+.replace-choice input{accent-color:#c2a46d}
+.file-button{display:inline-flex;position:relative;overflow:hidden;cursor:pointer}
+.file-button input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.file-button.disabled{opacity:.55;cursor:wait}
+.data-status{margin-top:16px;padding:12px 14px;border-left:2px solid var(--accent);background:#1a1b1d;color:#d8d4cb;font-size:13px}
+@media(max-width:700px){.data-tools-grid{grid-template-columns:1fr}.data-tool-actions{display:grid}.data-tool-actions>*{width:100%}}
