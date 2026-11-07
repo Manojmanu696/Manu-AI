@@ -114,3 +114,29 @@ test("local data page starts a complete backup download", async ({ page }) => {
   await page.getByRole("button", { name: "Download full backup" }).click();
   expect((await download).suggestedFilename()).toBe("ManuAI_Backup.zip");
 });
+
+test("cinema hero falls back without WebGL and respects mobile reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.addInitScript(() => {
+    const nativeGetContext = HTMLCanvasElement.prototype.getContext;
+    Object.defineProperty(HTMLCanvasElement.prototype, "getContext", {
+      configurable: true,
+      value: function (type: string, ...args: unknown[]) {
+        if (type === "webgl" || type === "webgl2" || type === "experimental-webgl") return null;
+        return Reflect.apply(nativeGetContext, this, [type, ...args]);
+      },
+    });
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockApi(page);
+  await page.goto("/");
+  await expect(page.locator(".feature-pick-immersive")).toBeVisible();
+  await expect(page.locator(".three-cinema.webgl-unavailable")).toBeVisible();
+  const layout = await page.evaluate(() => ({
+    width: window.innerWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+    reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  }));
+  expect(layout.reducedMotion).toBe(true);
+  expect(layout.scrollWidth).toBe(layout.width);
+});

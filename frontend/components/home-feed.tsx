@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { API_URL } from "@/lib/api";
 import "./home-feed.css";
 
@@ -19,6 +20,7 @@ type HomeResponse = { sections: Record<string, Section>; refreshing: boolean; la
   providers: Record<string, { status: string; last_error?: string }>; attribution: Record<string, string> };
 type SearchFilters = {genre:string;yearFrom:string;yearTo:string;runtimeMax:string;ratingMin:string;language:string;country:string;status:string;seasonsMax:string;episodesMax:string;episodeMinutesMax:string;provider:string};
 const emptyFilters:SearchFilters={genre:"",yearFrom:"",yearTo:"",runtimeMax:"",ratingMin:"",language:"",country:"",status:"",seasonsMax:"",episodesMax:"",episodeMinutesMax:"",provider:""};
+const ThreeCinema = dynamic(() => import("./three-cinema"), { ssr: false, loading: () => <div className="three-cinema-fallback" aria-hidden="true"/> });
 
 const sectionMeta: Record<string, { title: string; eyebrow?: string }> = {
   continue_watching: { title: "Continue watching" }, personalized_movies: { title: "Picked for your taste", eyebrow: "FILMS" },
@@ -52,6 +54,7 @@ export default function HomeFeed() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [mode, setMode] = useState("best_fit");
+  const [activeTab, setActiveTab] = useState("For you");
   const [mood, setMood] = useState("");
   const [query, setQuery] = useState("");
   const [type, setType] = useState("movie");
@@ -119,7 +122,7 @@ export default function HomeFeed() {
   }
 
   const [lastFeedbackId, setLastFeedbackId] = useState<number | null>(null);
-  const frontPick = useMemo(() => data?.sections.personalized_movies?.items?.[0] || data?.sections.trending_movies?.items?.[0], [data]);
+  const frontPick = useMemo(() => data?.sections.personalized_movies?.items?.[0] || data?.sections.trending_movies?.items?.[0] || data?.sections.personalized_tv?.items?.[0] || data?.sections.popular_anime?.items?.[0] || data?.sections.tvmaze_catalogue?.items?.[0], [data]);
   const labels = data?.providers || {};
   const hasSearch = query.trim().length >= 2;
   const filtersActive=Object.values(filters).some(Boolean);
@@ -146,8 +149,12 @@ export default function HomeFeed() {
   }),[searchResults,filters]);
   const visibleSections = Object.entries(sectionMeta).filter(([key]) => {
     if (key === "because_you_liked" && !data?.sections[key]?.based_on) return false;
+    if (activeTab === "Films" && !["personalized_movies", "trending_movies", "now_playing", "upcoming_movies", "recent_releases", "top_rated_movies", "short_movies", "psychological_thrillers", "mind_games", "intelligent_stories", "hidden_gems"].includes(key)) return false;
+    if (activeTab === "Series" && !["personalized_tv", "trending_tv", "top_rated_tv", "short_completed_series", "continue_watching"].includes(key)) return false;
+    if (activeTab === "Anime" && !["popular_anime", "seasonal_anime"].includes(key)) return false;
+    if (activeTab === "Hidden gems" && !["hidden_gems", "mind_games", "intelligent_stories"].includes(key)) return false;
     return (data?.sections[key]?.items?.length || 0) > 0;
-  });
+  }).filter(([key]) => activeTab !== "Mind games" || ["mind_games", "psychological_thrillers", "intelligent_stories"].includes(key));
 
   return <main className="feed-page">
     <header className="feed-header">
@@ -160,6 +167,11 @@ export default function HomeFeed() {
     {error && <div className="feed-notice error-notice" role="alert"><div><strong>Discovery is unavailable.</strong><p>{error}</p></div><button onClick={() => { setLoading(true); void load(); }}>Retry</button></div>}
     {data?.stale && <div className="feed-notice stale-notice" role="status"><strong>Some catalogue sections are stale.</strong><span>{refreshing?" Manu is refreshing them in the background.":" Available cached titles remain visible; retry after checking provider setup."}</span></div>}
     {labels.tmdb?.status === "not_configured" && <div className="feed-notice setup-notice"><div><strong>Connect TMDB for films and series.</strong><span> Anime and TVmaze titles can still appear. Add a free TMDB API key to enable movies, TV discovery, trailers and India availability.</span></div><a href="https://developer.themoviedb.org/docs/getting-started" target="_blank" rel="noreferrer">Get a TMDB key ↗</a></div>}
+
+    <nav className="cinema-tabs" aria-label="Top discovery suggestions">
+      {[["For you","best_fit"],["Films","best_fit"],["Series","best_fit"],["Anime","best_fit"],["Hidden gems","hidden_gems"],["Mind games","mystery"]].map(([label,nextMode])=><button key={label} className={activeTab===label?"active":""} aria-pressed={activeTab===label} onClick={()=>{setActiveTab(label);setMode(nextMode)}}>{label}</button>)}
+      <span className="tabs-context">{activeTab === "For you" ? "A selection shaped around your taste" : `Explore ${activeTab.toLowerCase()} from your live catalogue`}</span>
+    </nav>
 
     <section className="feed-controls" aria-label="Recommendation controls">
       <label><span>Mode</span><select value={mode} onChange={e => setMode(e.target.value)}>{modes.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
@@ -213,7 +225,9 @@ function formatDate(value: string) { const date = new Date(value); return Number
 
 function FeaturePick({ result, onFeedback }: { result: Recommendation; onFeedback: (item: Catalogue, action: string) => void }) {
   const item = result.item;
-  return <section className="feature-pick" style={item.backdrop_url ? { backgroundImage: `linear-gradient(90deg, #111216 0%, rgba(17,18,22,.94) 32%, rgba(17,18,22,.42) 76%, rgba(17,18,22,.28)), url("${safeImage(item.backdrop_url)}")` } : undefined}>
+  const artwork = useMemo(() => [item.image_url], [item.image_url]);
+  return <section className="feature-pick feature-pick-immersive" style={item.backdrop_url ? { backgroundImage: `linear-gradient(90deg, #111216 0%, rgba(17,18,22,.94) 32%, rgba(17,18,22,.42) 76%, rgba(17,18,22,.28)), url("${safeImage(item.backdrop_url)}")` } : undefined}>
+    <ThreeCinema title={item.title} artwork={artwork}/>
     <div className="feature-copy"><p className="feature-label">A PLACE TO START <span>·</span> {result.fit || "For you"}</p><h2>{item.title}</h2><p className="feature-meta">{item.release_year || ""}{item.release_year && item.genres ? " · " : ""}{item.genres || item.media_type}{item.runtime ? ` · ${item.runtime}` : ""}</p>
       <p className="feature-description">{item.description || "A title from the live catalogue, selected for your next watch."}</p><p className="feature-why">{result.reasons?.[0]}</p>
       <div className="feature-actions"><a className="feature-primary" href={`/title/${item.id}`}>Explore title</a><button onClick={() => onFeedback(item, "watchlist")}>Add to watchlist</button></div>
