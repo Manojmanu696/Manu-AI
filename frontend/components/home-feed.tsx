@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { API_URL } from "@/lib/api";
 import "./home-feed.css";
 
@@ -19,6 +20,7 @@ type HomeResponse = { sections: Record<string, Section>; refreshing: boolean; la
   providers: Record<string, { status: string; last_error?: string }>; attribution: Record<string, string> };
 type SearchFilters = {genre:string;yearFrom:string;yearTo:string;runtimeMax:string;ratingMin:string;language:string;country:string;status:string;seasonsMax:string;episodesMax:string;episodeMinutesMax:string;provider:string};
 const emptyFilters:SearchFilters={genre:"",yearFrom:"",yearTo:"",runtimeMax:"",ratingMin:"",language:"",country:"",status:"",seasonsMax:"",episodesMax:"",episodeMinutesMax:"",provider:""};
+const ThreeCinema = dynamic(() => import("./three-cinema"), { ssr: false, loading: () => <div className="three-cinema-fallback" aria-hidden="true"/> });
 
 const sectionMeta: Record<string, { title: string; eyebrow?: string }> = {
   continue_watching: { title: "Continue watching" }, personalized_movies: { title: "Picked for your taste", eyebrow: "FILMS" },
@@ -119,7 +121,7 @@ export default function HomeFeed() {
   }
 
   const [lastFeedbackId, setLastFeedbackId] = useState<number | null>(null);
-  const frontPick = useMemo(() => data?.sections.personalized_movies?.items?.[0] || data?.sections.trending_movies?.items?.[0], [data]);
+  const frontPick = useMemo(() => data?.sections.personalized_movies?.items?.[0] || data?.sections.trending_movies?.items?.[0] || data?.sections.personalized_tv?.items?.[0] || data?.sections.popular_anime?.items?.[0] || data?.sections.tvmaze_catalogue?.items?.[0], [data]);
   const labels = data?.providers || {};
   const hasSearch = query.trim().length >= 2;
   const filtersActive=Object.values(filters).some(Boolean);
@@ -213,7 +215,8 @@ function formatDate(value: string) { const date = new Date(value); return Number
 
 function FeaturePick({ result, onFeedback }: { result: Recommendation; onFeedback: (item: Catalogue, action: string) => void }) {
   const item = result.item;
-  return <section className="feature-pick" style={item.backdrop_url ? { backgroundImage: `linear-gradient(90deg, #111216 0%, rgba(17,18,22,.94) 32%, rgba(17,18,22,.42) 76%, rgba(17,18,22,.28)), url("${safeImage(item.backdrop_url)}")` } : undefined}>
+  return <section className="feature-pick feature-pick-immersive" style={item.backdrop_url ? { backgroundImage: `linear-gradient(90deg, #111216 0%, rgba(17,18,22,.94) 32%, rgba(17,18,22,.42) 76%, rgba(17,18,22,.28)), url("${safeImage(item.backdrop_url)}")` } : undefined}>
+    <ThreeCinema title={item.title}/>
     <div className="feature-copy"><p className="feature-label">A PLACE TO START <span>·</span> {result.fit || "For you"}</p><h2>{item.title}</h2><p className="feature-meta">{item.release_year || ""}{item.release_year && item.genres ? " · " : ""}{item.genres || item.media_type}{item.runtime ? ` · ${item.runtime}` : ""}</p>
       <p className="feature-description">{item.description || "A title from the live catalogue, selected for your next watch."}</p><p className="feature-why">{result.reasons?.[0]}</p>
       <div className="feature-actions"><a className="feature-primary" href={`/title/${item.id}`}>Explore title</a><button onClick={() => onFeedback(item, "watchlist")}>Add to watchlist</button></div>
