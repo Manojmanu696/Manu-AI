@@ -1,36 +1,29 @@
-# Manu AI Discovery Engine
+# Discovery and recommendation engine
 
-Manu AI now separates **candidate discovery** from **personal ranking**.
+## Feed lifecycle
 
-## Flow
+The home endpoint returns current SQLite snapshots immediately and schedules a background refresh when a section is missing or expired. Popular/trending, upcoming/release, and curated collections use separate cache intervals. Provider errors leave saved titles visible, record a last error, and use a short retry window. Manual refresh forces a worker run.
 
-1. `CatalogueItem` stores public discovery candidates. It never stores the user's personal rating or private notes.
-2. `MediaItem` stores the user's private library and interaction history.
-3. `Memory` stores explicit and inferred taste signals separately.
-4. `RecommendationFeedback` records like, not-for-me, watchlist, and watched actions.
-5. `services/discovery.py` combines these signals into an explainable ranking score.
-6. `/discover/web` and `/research/search` can query the public web when the user explicitly searches.
-7. Ollama/Qwen remains the local reasoning layer; web tools receive only public queries/URLs, never the private database context.
+## Candidate retrieval and ranking
 
-## Ranking signals
+The adapters retrieve candidates from TMDB, AniList, TVmaze, and the local catalogue. Search candidates are normalized and persisted before the UI gets an item ID. Search merging removes repeated same-type title/year records.
 
-- Repeatedly liked/completed genres
-- Repeatedly liked themes/tags
-- Genres associated with dislikes/dropped items
-- Explicit memory matches
-- Short/engaging/non-filler preference when present in memory
-- Recommendation feedback
-- A small public-quality signal from catalogue rating
+The local rank stage uses:
 
-The score is an ordering signal, not a probability or guarantee.
+- structured explicit/inferred taste signals with confidence and provenance;
+- highly and poorly rated library items (rated thresholds only);
+- repeated positive feedback on distinct titles;
+- per-title love/like/not-interested actions;
+- public rating with vote-count confidence weighting;
+- mode, temporary mood and novelty signals;
+- seen-title suppression and genre/franchise re-ranking.
 
-## API
+Content similarity uses lexical overlap and an optional local Ollama sentence-embedding stage. `OLLAMA_EMBEDDING_MODEL` defaults to `all-minilm`; only loopback Ollama URLs are accepted. Embeddings are content-hash cached in SQLite, rebuilt after local text changes, and compared against highly rated local titles and positive taste signals. When Ollama is absent, the lexical and structured ranker keeps working. No private title history or taste memory is placed in TMDB, AniList, or TVmaze requests. Ranking labels are qualitative and not probability estimates.
 
-- `GET /discover?media_type=movie&limit=24` — personalized local catalogue
-- `GET /discover/web?query=...` — public web discovery
-- `POST /discover/{catalogue_item_id}/feedback` — learn from user action
-- `GET /catalogue` — inspect candidate catalogue
-- `POST /research/search` — direct public web search
-- `POST /chat` — Ollama reasoning with read-only web tools when needed
+## Feedback and correction
 
-This architecture follows a local-first pattern: local inference and private state stay on the machine while public research is a separate, narrow retrieval boundary. Similar local-first systems commonly separate retrieval, provenance, and local inference for reliability and privacy. citeturn0search4turn0search2
+Actions include love, like, not interested, already watched, watchlist, started, completed, dropped, and a post-watch rating. Optional dislike reasons add a weak inferred signal only for the specific stated dimension. A dislike does not blacklist the title's genre. Feedback has an undo endpoint; when an action created or changed a linked library item, undo removes/restores that change as well.
+
+## Offline evaluation
+
+Backend tests use mocked responses and local SQLite. They cover provider normalization, transient rate-limit retry, additive migration preservation, completion-neutral behavior, feedback undo, offline embedding cache behavior, backup round trips, and reproducible ranking metrics. There is not yet enough owner-labelled feedback to estimate real-world Precision@K/Recall@K/NDCG@K or claim improved recommendation quality.

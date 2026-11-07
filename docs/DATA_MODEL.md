@@ -1,12 +1,25 @@
 # Data model
 
-## Media item
+SQLite remains the default and stores private data and normalized public catalogue data in separate tables.
 
-`media_items` holds movies, anime, TV shows, games, and books. It includes the title, description, comma-separated genres/tags, 1–10 personal rating, like/dislike/neutral sentiment, status, notes, dates, optional external identifiers/URLs, poster URL, and optional AI metadata. Statuses are `want`, `current`, `completed`, `dropped`, and `on_hold`.
+| Table | Contents | Privacy |
+| --- | --- | --- |
+| `media_items` | User library, status, personal rating, notes, dates | Private local profile |
+| `memories` | User-entered/imported context and explicitly sourced inferences | Private local profile |
+| `taste_signals` | Dimension, value, direction, strength, confidence, source, evidence and confirmation time | Private local profile |
+| `catalogue_items` | Provider-normalized titles, public metadata, IDs, poster/backdrop, ratings, detail JSON, timestamps | Public catalogue snapshot |
+| `discovery_section_cache` | Provider, section IDs, fetch/expiry time, last refresh error | Public cache metadata |
+| `recommendation_feedback` | Timestamped action, reason, temporary context and undo/library restoration state | Private interaction history |
+| `research_sources` | Existing source-attributed web research records | Local app data |
+| `schema_migrations` | Applied additive migration versions | Local app metadata |
+| `app_settings` | Small local migration/seed markers | Local app metadata |
 
-## Memory
+Catalogue rows are upserted by `(source_provider, provider_id)` and keep a separate source URL/external ID for explainability. Public records do not contain personal ratings or notes. Feedback events do not equate completion with enjoyment. User-facing rating remains separate from completion status.
 
-`memories` holds a category, content, source, and optional confidence. `source=user` means the owner entered it; `source=inferred` means it is a non-permanent AI inference. The UI always separates them.
+## Taste provenance
 
-`is_demo` makes sample data removable without touching real data. SQLite is a documented, broadly portable relational format; the export format avoids requiring it by including JSON and CSV.
+`source=explicit` signals are entered/confirmed by the user. `source=inferred` signals are hypotheses generated from optional feedback reasons. Both store direction and strength/confidence; deleting or editing a signal is supported. Private taste state is never sent to public search providers.
 
+## Backups and migrations
+
+Use **Data → Download complete backup** to export portable JSON/CSV and restore with the existing merge/replace flow. Migrations only add fields/tables/indexes. The migration runner records each successful schema version in `schema_migrations` and preserves existing library and memory content.
