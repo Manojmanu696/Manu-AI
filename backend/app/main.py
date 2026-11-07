@@ -1,12 +1,14 @@
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 import io, json, zipfile
+from sqlalchemy import text
 from fastapi import Depends, FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from .config import ALLOWED_ORIGINS, BACKUP_DIR
 from .database import Base, engine, get_db
+from .migrations import migrate
 from .demo import load_demo
 from .models import MediaItem, Memory
 from .schemas import ChatRequest, ChatResponse, MediaCreate, MediaOut, MediaUpdate, MemoryCreate, MemoryOut, MemoryImportRequest, MemoryImportResponse, PersonalSnapshot
@@ -21,6 +23,36 @@ from .services.ollama import OllamaUnavailable
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(bind=engine)
+    migrate(engine)
+    # Retain the pre-existing editable first-launch taste seed, but never add
+    # demo catalogue titles or modify a profile that already has memories.
+    from .models import Memory, TasteSignal
+    from .seed_profile import SEED_MEMORIES
+    from .database import SessionLocal
+    db = SessionLocal()
+    try:
+        if db.query(Memory).count() == 0:
+            db.add_all([Memory(**memory, is_demo=False) for memory in SEED_MEMORIES])
+            db.commit()
+        seeded = db.execute(text("SELECT value FROM app_settings WHERE key='taste_signal_seeded'" )).scalar_one_or_none()
+        if seeded is None:
+            if db.query(TasteSignal).count() == 0:
+                confirmed = datetime.now(timezone.utc).replace(tzinfo=None)
+                starter = [
+                    ("story_tone", "psychological mystery", "positive", .75),
+                    ("story_tone", "mind games and plot twists", "positive", .8),
+                    ("pacing", "short, engaging stories", "positive", .8),
+                    ("pacing", "slow emotional drama", "negative", .75),
+                    ("franchise", "Marvel and Iron Man", "positive", .9),
+                    ("anime", "Attack on Titan", "positive", .95),
+                ]
+                for dimension, value, direction, strength in starter:
+                    db.add(TasteSignal(dimension=dimension, value=value, direction=direction, strength=strength,
+                                       confidence=1, source="explicit", evidence="Existing Manu AI saved taste profile", confirmed_at=confirmed))
+            db.execute(text("INSERT INTO app_settings(key,value) VALUES ('taste_signal_seeded','1')"))
+            db.commit()
+    finally:
+        db.close()
     yield
 
 app = FastAPI(title="Manu AI API", version="0.5.0", description="Local-first personal discovery dashboard API", lifespan=lifespan)
@@ -114,7 +146,18 @@ def get_recommendations(media_type:str|None=None,limit:int=Query(12,ge=1,le=50),
 # Real discovery endpoints used by the Home search. Local library contents are never required.
 @app.get("/discover")
 def get_discover(media_type:str|None=None,limit:int=Query(18,ge=1,le=50),query:str|None=None,db:Session=Depends(get_db)):
-    return discover(db,media_type,limit,query)
+    rows = discover(db, media_type, limit, query)
+    from .services.home_feed import _upsert_item
+    output = []
+    for result in rows:
+        item = result["item"]
+        if isinstance(item, dict) and item.get("source_provider") and item.get("provider_id"):
+            item = _upsert_item(db, item)
+        if not isinstance(item, dict):
+            item = {key: value for key, value in item.__dict__.items() if key != "_sa_instance_state"}
+        output.append({**result, "item": item})
+    db.commit()
+    return output
 
 @app.post("/research/search")
 def research_search(payload:dict):
@@ -149,7 +192,7 @@ def export_json(db:Session=Depends(get_db)):
 def export_csv(dataset:str=Query("media"),db:Session=Depends(get_db)):
     rows=[serialize_media(i) for i in db.query(MediaItem).all()] if dataset=="media" else [serialize_memory(i) for i in db.query(Memory).all()];return StreamingResponse(iter([csv_text(rows)]),media_type="text/csv",headers={"Content-Disposition":f"attachment; filename=ManuAI_{dataset}.csv"})
 
-@app.get("/data/export/zip")
+@app.api_route("/data/export/zip", methods=["GET", "POST"])
 def export_zip(db:Session=Depends(get_db)):
     path=build_zip(db);return FileResponse(path,media_type="application/zip",filename=path.name)
 

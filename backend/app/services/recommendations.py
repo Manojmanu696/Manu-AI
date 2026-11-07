@@ -9,13 +9,15 @@ def _terms(value: str | None) -> set[str]:
 
 def score_candidate(candidate: MediaItem, history: list[MediaItem], memories: list[Memory]):
     score, reasons = 45, []
-    liked = [i for i in history if (i.personal_rating or 0) >= 8 or i.sentiment == "like" or i.status == "completed"]
-    disliked = [i for i in history if (i.personal_rating or 0) <= 5 or i.sentiment == "dislike" or i.status == "dropped"]
+    # A watched/completed title without a rating is neutral evidence.
+    liked = [i for i in history if (i.personal_rating >= 8 if i.personal_rating is not None else i.sentiment == "like")]
+    disliked = [i for i in history if (i.personal_rating <= 4 if i.personal_rating is not None else i.sentiment == "dislike")]
     genres, tags = _terms(candidate.genres), _terms(candidate.tags)
     liked_genres = Counter(g for i in liked for g in _terms(i.genres))
     liked_tags = Counter(t for i in liked for t in _terms(i.tags))
     disliked_genres = Counter(g for i in disliked for g in _terms(i.genres))
-    genre_hits, tag_hits, avoid_hits = genres & set(liked_genres), tags & set(liked_tags), genres & set(disliked_genres)
+    genre_hits, tag_hits = genres & set(liked_genres), tags & set(liked_tags)
+    avoid_hits = genres & {genre for genre, count in disliked_genres.items() if count >= 2}
     if genre_hits:
         score += min(24, 6 * sum(liked_genres[g] for g in genre_hits)); reasons.append(f"Matches genres you repeatedly enjoy: {', '.join(sorted(genre_hits)[:3])}")
     if tag_hits:

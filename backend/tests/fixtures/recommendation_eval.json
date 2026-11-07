@@ -1,0 +1,12 @@
+{
+  "ranked_ids": ["title-a", "title-b", "title-c", "title-d"],
+  "relevant_ids": ["title-a", "title-c"],
+  "catalogue_size": 8,
+  "genres": {
+    "title-a": ["mystery", "thriller"],
+    "title-b": ["romance", "drama"],
+    "title-c": ["science fiction", "mystery"],
+    "title-d": ["mystery", "thriller"]
+  },
+  "popularity": {"title-a": 0.8, "title-b": 0.6, "title-c": 0.1, "title-d": 0.9}
+}
