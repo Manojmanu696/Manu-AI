@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { API_URL } from "@/lib/api";
 import "./home-feed.css";
 
@@ -20,7 +19,6 @@ type HomeResponse = { sections: Record<string, Section>; refreshing: boolean; la
   providers: Record<string, { status: string; last_error?: string }>; attribution: Record<string, string> };
 type SearchFilters = {genre:string;yearFrom:string;yearTo:string;runtimeMax:string;ratingMin:string;language:string;country:string;status:string;seasonsMax:string;episodesMax:string;episodeMinutesMax:string;provider:string};
 const emptyFilters:SearchFilters={genre:"",yearFrom:"",yearTo:"",runtimeMax:"",ratingMin:"",language:"",country:"",status:"",seasonsMax:"",episodesMax:"",episodeMinutesMax:"",provider:""};
-const ThreeCinema = dynamic(() => import("./three-cinema"), { ssr: false, loading: () => <div className="three-cinema-fallback" aria-hidden="true"/> });
 
 const sectionMeta: Record<string, { title: string; eyebrow?: string }> = {
   continue_watching: { title: "Continue watching" }, personalized_movies: { title: "Picked for your taste", eyebrow: "FILMS" },
@@ -48,7 +46,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return res.status === 204 ? undefined as T : res.json();
 }
 
-export default function HomeFeed() {
+export default function HomeFeed({ discover = false }: { discover?: boolean }) {
   const [data, setData] = useState<HomeResponse | null>(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -57,7 +55,10 @@ export default function HomeFeed() {
   const [activeTab, setActiveTab] = useState("For you");
   const [mood, setMood] = useState("");
   const [query, setQuery] = useState("");
-  const [type, setType] = useState("movie");
+  const [type, setType] = useState(discover ? "all" : "movie");
+  const [localShelf, setLocalShelf] = useState<Section>();
+  const [shelfError, setShelfError] = useState("");
+  const localType = activeTab === "Games" ? "game" : activeTab === "Books" ? "book" : "";
   const [filters, setFilters] = useState<SearchFilters>(emptyFilters);
   const [searchResults, setSearchResults] = useState<Recommendation[]>([]);
   const [searchError, setSearchError] = useState("");
@@ -75,6 +76,16 @@ export default function HomeFeed() {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => {
+    setLocalShelf(undefined);
+    setShelfError("");
+    if (!localType) return;
+    const controller = new AbortController();
+    request<Recommendation[]>(`/discover?media_type=${localType}&limit=24`, {signal:controller.signal})
+      .then(items => { if (!controller.signal.aborted) setLocalShelf({items}); })
+      .catch(error => { if (!controller.signal.aborted) setShelfError(error.message); });
+    return () => controller.abort();
+  }, [localType]);
+  useEffect(() => {
     if (!refreshing) return;
     const timer = window.setInterval(() => { void load(); }, 2500);
     return () => window.clearInterval(timer);
@@ -82,18 +93,19 @@ export default function HomeFeed() {
   useEffect(() => {
     const term = query.trim();
     if (term.length < 2) { setSearchResults([]); setSearchError(""); setSearching(false); return; }
+    const controller = new AbortController();
     const timer = window.setTimeout(async () => {
       setSearching(true); setSearchError("");
       try {
-        const types = type === "all" ? ["movie", "tv", "anime"] : [type];
-        const resultSets = await Promise.all(types.map(async media => request<Recommendation[]>(`/discover?media_type=${media}&limit=40&query=${encodeURIComponent(term)}`)));
+        const types = type === "all" ? ["movie", "tv", "anime", "game", "book"] : [type];
+        const resultSets = await Promise.all(types.map(async media => request<Recommendation[]>(`/discover?media_type=${media}&limit=40&query=${encodeURIComponent(term)}`, {signal:controller.signal})));
         const merged = resultSets.flat().filter(x => x.item?.title);
         const unique = new Map(merged.map(x => [`${x.item.media_type}:${x.item.external_id || x.item.title}`, x]));
-        setSearchResults([...unique.values()]);
-      } catch (e) { setSearchError(e instanceof Error ? e.message : "Search could not reach the catalogue"); }
-      finally { setSearching(false); }
+        if (!controller.signal.aborted) setSearchResults([...unique.values()]);
+      } catch (e) { if (!controller.signal.aborted) setSearchError(e instanceof Error ? e.message : "Search could not reach the catalogue"); }
+      finally { if (!controller.signal.aborted) setSearching(false); }
     }, 350);
-    return () => window.clearTimeout(timer);
+    return () => { window.clearTimeout(timer); controller.abort(); };
   }, [query, type]);
 
   async function refresh() {
@@ -122,7 +134,6 @@ export default function HomeFeed() {
   }
 
   const [lastFeedbackId, setLastFeedbackId] = useState<number | null>(null);
-  const frontPick = useMemo(() => data?.sections.personalized_movies?.items?.[0] || data?.sections.trending_movies?.items?.[0] || data?.sections.personalized_tv?.items?.[0] || data?.sections.popular_anime?.items?.[0] || data?.sections.tvmaze_catalogue?.items?.[0], [data]);
   const labels = data?.providers || {};
   const hasSearch = query.trim().length >= 2;
   const filtersActive=Object.values(filters).some(Boolean);
@@ -156,21 +167,26 @@ export default function HomeFeed() {
     return (data?.sections[key]?.items?.length || 0) > 0;
   }).filter(([key]) => activeTab !== "Mind games" || ["mind_games", "psychological_thrillers", "intelligent_stories"].includes(key));
 
-  return <main className="feed-page">
+  const featuredCandidates = visibleSections
+    .filter(([key]) => key !== "continue_watching")
+    .flatMap(([key]) => data?.sections[key]?.items ?? [])
+    .filter(result => !result.is_local && !result.item.is_local && result.item.id > 0);
+  const frontPick = localType ? localShelf?.items[0] : featuredCandidates[0];
+  const tabs = [["For you","best_fit"],["Films","best_fit"],["Series","best_fit"],["Anime","best_fit"],["Hidden gems","hidden_gems"],["Mind games","mystery"]];
+  if (discover) tabs.splice(4, 0, ["Games","best_fit"],["Books","best_fit"]);
+  const searchTypes: Record<string,string> = {Films:"movie",Series:"tv",Anime:"anime",Games:"game",Books:"book"};
+
+  return <div className="feed-page">
     <header className="feed-header">
-      <div><p className="feed-overline">MANU AI <span>·</span> PERSONAL CINEMA</p><h1>Your next watch.</h1></div>
+      <div><h1>{discover ? "Discover" : "Your next watch."}</h1>{discover && <p className="discover-intro">Browse by format or find a story that fits your mood.</p>}</div>
       <div className="feed-header-tools"><span className={`freshness ${data?.stale ? "is-stale" : ""}`}><i/>{refreshing ? "Refreshing in background" : data?.stale ? `Some sources need attention${data.last_updated?` · updated ${formatDate(data.last_updated)}`:""}` : data?.last_updated ? `Updated ${formatDate(data.last_updated)}` : "Ready to discover"}</span>
         <button className="quiet-button" onClick={refresh} disabled={refreshing} aria-label="Refresh discovery feed">{refreshing ? "Refreshing…" : "Refresh"}</button>
       </div>
     </header>
 
     {error && <div className="feed-notice error-notice" role="alert"><div><strong>Discovery is unavailable.</strong><p>{error}</p></div><button onClick={() => { setLoading(true); void load(); }}>Retry</button></div>}
-    {data?.stale && <div className="feed-notice stale-notice" role="status"><strong>Some catalogue sections are stale.</strong><span>{refreshing?" Manu is refreshing them in the background.":" Available cached titles remain visible; retry after checking provider setup."}</span></div>}
-    {labels.tmdb?.status === "not_configured" && <div className="feed-notice setup-notice"><div><strong>Connect TMDB for films and series.</strong><span> Anime and TVmaze titles can still appear. Add a free TMDB API key to enable movies, TV discovery, trailers and India availability.</span></div><a href="https://developer.themoviedb.org/docs/getting-started" target="_blank" rel="noreferrer">Get a TMDB key ↗</a></div>}
-
     <nav className="cinema-tabs" aria-label="Top discovery suggestions">
-      {[["For you","best_fit"],["Films","best_fit"],["Series","best_fit"],["Anime","best_fit"],["Hidden gems","hidden_gems"],["Mind games","mystery"]].map(([label,nextMode])=><button key={label} className={activeTab===label?"active":""} aria-pressed={activeTab===label} onClick={()=>{setActiveTab(label);setMode(nextMode)}}>{label}</button>)}
-      <span className="tabs-context">{activeTab === "For you" ? "A selection shaped around your taste" : `Explore ${activeTab.toLowerCase()} from your live catalogue`}</span>
+      {tabs.map(([label,nextMode])=><button key={label} className={activeTab===label?"active":""} aria-pressed={activeTab===label} onClick={()=>{setActiveTab(label);setMode(nextMode);setType(searchTypes[label] || "all")}}>{label}</button>)}
     </nav>
 
     <section className="feed-controls" aria-label="Recommendation controls">
@@ -179,10 +195,10 @@ export default function HomeFeed() {
       {mood && <button className="clear-mood" onClick={() => setMood("")}>Clear mood</button>}
     </section>
 
-    <section className="feed-search" aria-label="Search films and series">
+    <section className="feed-search" aria-label="Catalogue search">
       <span className="feed-search-icon" aria-hidden="true">⌕</span>
-      <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search films, series and anime" aria-label="Search films, series and anime" />
-      <select value={type} onChange={e => setType(e.target.value)} aria-label="Filter by title type"><option value="movie">Films</option><option value="tv">Series</option><option value="anime">Anime</option><option value="all">Everything</option></select>
+      <input value={query} onChange={e => setQuery(e.target.value)} placeholder={discover ? "Search the catalogue" : "Search films, series and anime"} aria-label={discover ? "Search the catalogue" : "Search films, series and anime"} />
+      <select value={type} onChange={e => setType(e.target.value)} aria-label="Filter by title type"><option value="movie">Films</option><option value="tv">Series</option><option value="anime">Anime</option><option value="game">Games</option><option value="book">Books</option><option value="all">Everything</option></select>
       {query && <button className="search-clear" aria-label="Clear search" onClick={() => setQuery("")}>×</button>}
     </section>
 
@@ -208,30 +224,60 @@ export default function HomeFeed() {
     </section> : <>
       {!frontPick && loading && <><div className="feed-feature-skeleton"/><SkeletonSection/><SkeletonSection/></>}
       {frontPick && <FeaturePick result={frontPick} onFeedback={feedback}/>}
-      {visibleSections.map(([key, meta]) => <FeedSection key={key} title={key === "because_you_liked" && data?.sections[key]?.based_on ? `Because you liked ${data.sections[key].based_on}` : meta.title}
+      {localType && (shelfError ? <p className="empty-feed" role="alert">{shelfError}</p> : !localShelf ? <SkeletonSection/> : localShelf.items.length ? <FeedSection title={activeTab} section={localShelf} onFeedback={feedback}/> : <p className="empty-feed">No {activeTab.toLowerCase()} in the catalogue yet. Try another format or search by title.</p>)}
+      {!localType && visibleSections.map(([key, meta]) => <FeedSection key={key} title={key === "because_you_liked" && data?.sections[key]?.based_on ? `Because you liked ${data.sections[key].based_on}` : meta.title}
         eyebrow={meta.eyebrow} section={data?.sections[key]} onFeedback={feedback}/>) }
-      {!loading && !refreshing && !visibleSections.length && !error && <div className="feed-empty"><h2>Your catalogue is warming up.</h2><p>Manu is checking its public catalogue. Give it a moment, then refresh if nothing appears.</p><button onClick={refresh}>Try again</button></div>}
+      {!loading && !refreshing && !visibleSections.length && !localType && !error && <div className="feed-empty"><h2>Your catalogue is warming up.</h2><p>Manu is checking its public catalogue. Give it a moment, then refresh if nothing appears.</p><button onClick={refresh}>Try again</button></div>}
     </>}
+
+    {(data?.stale || labels.tmdb?.status === "not_configured") && <details className="catalogue-status">
+      <summary>Catalogue sources</summary>
+    {data?.stale && <div className="feed-notice stale-notice" role="status"><strong>Some catalogue sections are stale.</strong><span>{refreshing?" Manu is refreshing them in the background.":" Available cached titles remain visible; retry after checking provider setup."}</span></div>}
+    {labels.tmdb?.status === "not_configured" && <div className="feed-notice setup-notice"><div><strong>Connect TMDB for films and series.</strong><span> Anime and TVmaze titles can still appear. Add a free TMDB API key to enable movies, TV discovery, trailers and India availability.</span></div><a href="https://developer.themoviedb.org/docs/getting-started" target="_blank" rel="noreferrer">Get a TMDB key ↗</a></div>}
+
+    </details>}
 
     <footer className="feed-attribution">
       <div className="feed-attribution-main">{data?.attribution?.tmdb && <a href="https://www.themoviedb.org" target="_blank" rel="noreferrer" aria-label="Visit TMDB"><img src="https://www.themoviedb.org/assets/v4/logos/v2/blue_short-8e7b30f73a4020692ccca9c88bafe5dcb6f8a62a4c6bc55cd9ba82bb2cd95f6c.svg" alt="TMDB" width="92" height="18"/></a>}<span>{data?.attribution?.tmdb || "Movie and series metadata provided by their respective sources."}</span></div>
       <div className="feed-attribution-sources"><span>{data?.attribution?.tvmaze || "TV data provided by TVmaze."}</span><a href="https://www.justwatch.com/in" target="_blank" rel="noreferrer">Streaming availability powered by JustWatch via TMDB</a><span>Your private library and preference signals stay on this device.</span></div>
     </footer>
     {toast && <div className="feed-toast" role="status"><span>{toast}</span>{lastFeedbackId && <button onClick={undoLast}>Undo</button>}</div>}
-  </main>;
+  </div>;
 }
 
 function formatDate(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "recently" : date.toLocaleString([], { dateStyle: "medium", timeStyle: "short" }); }
 
 function FeaturePick({ result, onFeedback }: { result: Recommendation; onFeedback: (item: Catalogue, action: string) => void }) {
   const item = result.item;
-  const artwork = useMemo(() => [item.image_url], [item.image_url]);
-  return <section className="feature-pick feature-pick-immersive" style={item.backdrop_url ? { backgroundImage: `linear-gradient(90deg, #111216 0%, rgba(17,18,22,.94) 32%, rgba(17,18,22,.42) 76%, rgba(17,18,22,.28)), url("${safeImage(item.backdrop_url)}")` } : undefined}>
-    <ThreeCinema title={item.title} artwork={artwork}/>
-    <div className="feature-copy"><p className="feature-label">A PLACE TO START <span>·</span> {result.fit || "For you"}</p><h2>{item.title}</h2><p className="feature-meta">{item.release_year || ""}{item.release_year && item.genres ? " · " : ""}{item.genres || item.media_type}{item.runtime ? ` · ${item.runtime}` : ""}</p>
-      <p className="feature-description">{item.description || "A title from the live catalogue, selected for your next watch."}</p><p className="feature-why">{result.reasons?.[0]}</p>
-      <div className="feature-actions"><a className="feature-primary" href={`/title/${item.id}`}>Explore title</a><button onClick={() => onFeedback(item, "watchlist")}>Add to watchlist</button></div>
-    </div><a href={`/title/${item.id}`} className="feature-poster-link" aria-label={`View ${item.title}`}><Poster item={item} /></a>
+  const stage = useRef<HTMLElement>(null);
+  const backdrop = item.source_provider === "tvmaze" ? "" : safeImage(item.backdrop_url);
+  const poster = safeImage(item.image_url);
+  const art = backdrop || poster;
+  function resetMotion() {
+    stage.current?.style.removeProperty("--pointer-x");
+    stage.current?.style.removeProperty("--pointer-y");
+  }
+  return <section
+    ref={stage}
+    className={`feature-pick feature-pick-immersive ${backdrop ? "has-backdrop" : "poster-only"}`}
+    onPointerMove={event => {
+      if (event.pointerType !== "mouse" || !window.matchMedia("(prefers-reduced-motion: no-preference)").matches) return;
+      const bounds = event.currentTarget.getBoundingClientRect();
+      event.currentTarget.style.setProperty("--pointer-x", `${(event.clientX - bounds.left) / bounds.width - 0.5}`);
+      event.currentTarget.style.setProperty("--pointer-y", `${(event.clientY - bounds.top) / bounds.height - 0.5}`);
+    }}
+    onPointerLeave={resetMotion}
+  >
+    {art && <div className="feature-backdrop" aria-hidden="true" style={{backgroundImage:`url("${art}")`}}/>}
+    {poster && !backdrop && <div className="feature-cover" aria-hidden="true"><Poster item={item} featured/></div>}
+    <div className="feature-copy">
+      <p className="feature-label">Featured selection</p>
+      <h2>{item.title}</h2>
+      <p className="feature-meta">{[item.release_year, item.genres || item.media_type, item.runtime || (item.runtime_minutes ? `${item.runtime_minutes} min` : "")].filter(Boolean).join(" · ")}</p>
+      {item.description && <p className="feature-description">{item.description}</p>}
+      {result.reasons?.[0] && <p className="feature-why">{result.reasons[0]}</p>}
+      {item.id > 0 && <div className="feature-actions"><a className="feature-primary" href={`/title/${item.id}`}>Explore title <span aria-hidden="true">→</span></a><button onClick={() => onFeedback(item, "watchlist")}>Add to watchlist</button></div>}
+    </div>
   </section>;
 }
 
@@ -251,10 +297,11 @@ function PosterRail({ items, onFeedback }: { items: Recommendation[]; onFeedback
     </article>)}</div>;
 }
 
-function posterContent(item: Catalogue, fit?: string) { return <><div className="poster-frame"><Poster item={item}/><span className="poster-fit">{fit || "New to you"}</span></div><h3>{item.title}</h3><p>{[item.release_year, item.genres?.split(",")[0]].filter(Boolean).join(" · ") || item.media_type}</p></>; }
+function posterContent(item: Catalogue, fit?: string) { return <><div className="poster-frame"><Poster item={item}/></div><h3>{item.title}</h3>{fit && <span className="poster-fit">{fit}</span>}<p>{[item.release_year, item.genres?.split(",")[0]].filter(Boolean).join(" · ") || item.media_type}</p></>; }
 
-function Poster({ item }: { item: Catalogue }) {
-  return item.image_url ? <img src={safeImage(item.image_url)} alt={`${item.title} poster`} loading="lazy" referrerPolicy="no-referrer"/> : <span className="poster-fallback">{item.title?.slice(0, 1) || "M"}</span>;
+function Poster({ item, featured = false }: { item: Catalogue; featured?: boolean }) {
+  const image = safeImage(item.image_url);
+  return <><span className="poster-fallback">{item.title}</span>{image && <img src={image} alt="" loading={featured ? "eager" : "lazy"} referrerPolicy="no-referrer" onError={event => { event.currentTarget.hidden = true; }}/>}</>;
 }
 function safeImage(url?: string) { return url && /^https:\/\/(image\.tmdb\.org|s4\.anilist\.co|static\.tvmaze\.com)\//.test(url) ? url : ""; }
 

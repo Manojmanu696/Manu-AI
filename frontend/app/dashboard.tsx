@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import HomeFeed from "@/components/home-feed";
 import { Sidebar } from "@/components/sidebar";
 import { MediaCard } from "@/components/media-card";
-import { API_URL, api, MediaItem, Memory, Recommendation } from "@/lib/api";
+import { API_URL, api, MediaItem, Memory } from "@/lib/api";
 import "./data-tools.css";
 
 const labels: Record<string,string> = { home:"Home", discover:"Discover", movie:"Movies", anime:"Anime", tv:"TV Shows", game:"Games", book:"Books", memory:"Memory", data:"Data", ai:"AI", settings:"Settings" };
@@ -12,17 +12,15 @@ type Summary={database_bytes:number;counts:Record<string,number>;memories:number
 type TasteSignal={id:number;dimension:string;value:string;direction:string;strength:number;confidence:number;source:string;evidence:string;confirmed_at:string|null;created_at:string};
 
 export default function Dashboard(){
- const [page,setPage]=useState("home"),[items,setItems]=useState<MediaItem[]>([]),[recs,setRecs]=useState<Recommendation[]>([]),[memories,setMemories]=useState<Memory[]>([]),[signals,setSignals]=useState<TasteSignal[]>([]),[summary,setSummary]=useState<Summary|null>(null),[loading,setLoading]=useState(true);
- const refresh=async()=>{try{const [m,r,mm,s,ts]=await Promise.all([api<MediaItem[]>("/media"),api<Recommendation[]>("/recommendations?limit=24"),api<Memory[]>("/memories"),api<Summary>("/data/summary"),api<TasteSignal[]>("/taste-signals")]);setItems(m);setRecs(r);setMemories(mm);setSummary(s);setSignals(ts)}catch{}finally{setLoading(false)}};
+ const [page,setPage]=useState("home"),[items,setItems]=useState<MediaItem[]>([]),[memories,setMemories]=useState<Memory[]>([]),[signals,setSignals]=useState<TasteSignal[]>([]),[summary,setSummary]=useState<Summary|null>(null),[loading,setLoading]=useState(true);
+ const refresh=async()=>{try{const [m,mm,s,ts]=await Promise.all([api<MediaItem[]>("/media"),api<Memory[]>("/memories"),api<Summary>("/data/summary"),api<TasteSignal[]>("/taste-signals")]);setItems(m);setMemories(mm);setSummary(s);setSignals(ts)}catch{}finally{setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
  if(loading)return <div className="boot"><span className="brand-mark">M</span><p>Opening Manu AI…</p></div>;
  const label=labels[page]||"Home";
- return <main className="shell"><Sidebar active={page} onNavigate={setPage}/><section className="main"><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{page==="home"&&<HomeFeed/>}{page==="discover"&&<Discover recs={recs}/>} {mediaTypes[page]&&<Library label={label} items={items.filter(x=>x.media_type===mediaTypes[page])}/>} {page==="memory"&&<MemoryPage memories={memories} signals={signals} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</section></main>;
+ return <main className="shell"><Sidebar active={page} onNavigate={setPage}/><section className="main"><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{page==="home"&&<HomeFeed/>}{page==="discover"&&<HomeFeed key="discover" discover/>} {mediaTypes[page]&&<Library label={label} items={items.filter(x=>x.media_type===mediaTypes[page])}/>} {page==="memory"&&<MemoryPage memories={memories} signals={signals} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</section></main>;
 }
 
-function Discover({recs}:{recs:Recommendation[]}){return <div className="content"><section className="page-intro"><p className="eyebrow">DISCOVER</p><h1>Find your next obsession.</h1><p>Personalized recommendations from your saved taste and catalogue.</p></section>{recs.length?<div className="recommendation-grid">{recs.map(r=><MediaCard key={r.item.id} recommendation={r}/>)}</div>:<div className="library-empty"><h2>No recommendations yet.</h2><p>Use Home search to discover current movies, anime, shows, games and books.</p></div>}</div>}
-
-function Library({label,items}:{label:string;items:MediaItem[]}){const[q,setQ]=useState("");const show=items.filter(i=>i.title.toLowerCase().includes(q.toLowerCase()));return <div className="content"><section className="library-head"><div><p className="eyebrow">YOUR LIBRARY</p><h1>{label}</h1><p>{items.length} {items.length===1?"item":"items"} saved locally.</p></div></section><div className="library-tools"><div className="search-field"><span>⌕</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}/></div></div>{show.length?<div className="library-grid">{show.map(i=><MediaCard key={i.id} item={i}/>)}</div>:<div className="library-empty"><h2>No saved {label.toLowerCase()}.</h2><p>Your local library can be empty. Home still searches the internet and can personalize discovery.</p></div>}</div>}
+function Library({label,items}:{label:string;items:MediaItem[]}){const[q,setQ]=useState("");const show=items.filter(i=>i.title.toLowerCase().includes(q.toLowerCase()));return <div className="content"><section className="library-head"><div><h1>{label}</h1><p>{items.length} {items.length===1?"item":"items"} saved locally.</p></div></section><div className="library-tools"><div className="search-field"><span>⌕</span><input aria-label={`Search ${label.toLowerCase()} library`} value={q} onChange={e=>setQ(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}/></div></div>{show.length?<div className="library-grid">{show.map(i=><MediaCard key={i.id} item={i}/>)}</div>:<div className="library-empty"><h2>No saved {label.toLowerCase()}.</h2><p>Your local library can be empty. Home still searches the internet and can personalize discovery.</p></div>}</div>}
 
 function MemoryPage({memories,signals,refresh}:{memories:Memory[];signals:TasteSignal[];refresh:()=>void}){
  const[text,setText]=useState(""),[category,setCategory]=useState("favorite genres");

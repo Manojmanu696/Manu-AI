@@ -115,7 +115,7 @@ test("local data page starts a complete backup download", async ({ page }) => {
   expect((await download).suggestedFilename()).toBe("ManuAI_Backup.zip");
 });
 
-test("cinema hero falls back without WebGL and respects mobile reduced motion", async ({ page }) => {
+test("cinema artwork renders without WebGL and respects mobile reduced motion", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.addInitScript(() => {
     const nativeGetContext = HTMLCanvasElement.prototype.getContext;
@@ -131,7 +131,8 @@ test("cinema hero falls back without WebGL and respects mobile reduced motion", 
   await mockApi(page);
   await page.goto("/");
   await expect(page.locator(".feature-pick-immersive")).toBeVisible();
-  await expect(page.locator(".three-cinema.webgl-unavailable")).toBeVisible();
+  await expect(page.locator(".feature-pick-immersive canvas")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Explore title" })).toBeVisible();
   const layout = await page.evaluate(() => ({
     width: window.innerWidth,
     scrollWidth: document.documentElement.scrollWidth,
