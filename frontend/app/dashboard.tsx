@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import SearchExperience from "@/components/search-experience";
+import CinemaHome from "@/components/cinema-home";
 import { Sidebar } from "@/components/sidebar";
 import { MediaCard } from "@/components/media-card";
 import { api, MediaItem, Memory, Recommendation } from "@/lib/api";
@@ -15,7 +15,7 @@ export default function Dashboard(){
  useEffect(()=>{void refresh()},[]);
  if(loading)return <div className="boot"><span className="brand-mark">M</span><p>Opening Manu AI…</p></div>;
  const label=labels[page]||"Home";
- return <main className="shell"><Sidebar active={page} onNavigate={setPage}/><section className="main"><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{page==="home"&&<SearchExperience/>}{page==="discover"&&<Discover recs={recs}/>} {mediaTypes[page]&&<Library label={label} items={items.filter(x=>x.media_type===mediaTypes[page])}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</section></main>;
+ return <div className="shell cinema-shell"><Sidebar active={page} onNavigate={setPage}/><main className="main">{page==="home"?<CinemaHome items={items} recommendations={recs} onRefresh={refresh}/>:<><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{page==="discover"&&<Discover recs={recs}/>} {mediaTypes[page]&&<Library label={label} items={items.filter(x=>x.media_type===mediaTypes[page])}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</>}</main></div>;
 }
 
 function Discover({recs}:{recs:Recommendation[]}){return <div className="content"><section className="page-intro"><p className="eyebrow">DISCOVER</p><h1>Find your next obsession.</h1><p>Personalized recommendations from your saved taste and catalogue.</p></section>{recs.length?<div className="recommendation-grid">{recs.map(r=><MediaCard key={r.item.id} recommendation={r}/>)}</div>:<div className="library-empty"><h2>No recommendations yet.</h2><p>Use Home search to discover current movies, anime, shows, games and books.</p></div>}</div>}

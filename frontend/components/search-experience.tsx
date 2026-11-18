@@ -1,6 +1,6 @@
 "use client";
-import { FormEvent, useEffect, useState } from "react";
-import { api, Recommendation } from "@/lib/api";
+import { FormEvent, ReactNode, useEffect, useState } from "react";
+import { api } from "@/lib/api";
 
 type Mode="ai"|"google";
 type SearchResult={title:string;url:string;snippet?:string;provider?:string};
@@ -12,9 +12,8 @@ const mediaWords:Record<string,string[]>={movie:["movie","movies","film","films"
 function infer(q:string){const words=q.toLowerCase().replace(/[^a-z0-9]+/g," ").split(/\s+/);for(const [type,keys] of Object.entries(mediaWords))if(keys.some(k=>words.includes(k)))return type;return "all"}
 function googleUrl(q:string,cat:string){const extra=cat==="movie"?" movies":cat==="anime"?" anime":cat==="tv"?" TV series":cat==="game"?" video games":cat==="book"?" books":cat==="video"?" videos":cat==="news"?" news":"";return `https://www.google.com/search?q=${encodeURIComponent(q+extra)}`}
 
-export default function SearchExperience(){
- const[mode,setMode]=useState<Mode>("ai"),[category,setCategory]=useState("all"),[query,setQuery]=useState(""),[results,setResults]=useState<SearchResult[]>([]),[discovery,setDiscovery]=useState<DiscoveryResult[]>([]),[answer,setAnswer]=useState<ChatResult|null>(null),[localRecs,setLocalRecs]=useState<Recommendation[]>([]),[busy,setBusy]=useState(false),[searched,setSearched]=useState(false),[error,setError]=useState("");
- useEffect(()=>{api<Recommendation[]>("/recommendations?limit=12").then(setLocalRecs).catch(()=>setLocalRecs([]))},[]);
+export default function SearchExperience({browse}: {browse: ReactNode}){
+const[mode,setMode]=useState<Mode>("ai"),[category,setCategory]=useState("all"),[query,setQuery]=useState(""),[results,setResults]=useState<SearchResult[]>([]),[discovery,setDiscovery]=useState<DiscoveryResult[]>([]),[answer,setAnswer]=useState<ChatResult|null>(null),[busy,setBusy]=useState(false),[searched,setSearched]=useState(false),[error,setError]=useState("");
  useEffect(()=>{const h=(e:KeyboardEvent)=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="k"){e.preventDefault();document.querySelector<HTMLInputElement>(".global-search input")?.focus()}};window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h)},[]);
  async function runSearch(e?:FormEvent,forcedQuery?:string,forcedCategory?:string){e?.preventDefault();const text=(forcedQuery??query).trim();if(!text||busy)return;const selected=forcedCategory??category;const inferred=selected==="all"?infer(text):selected;setQuery(text);setCategory(inferred);setSearched(true);setBusy(true);setError("");setAnswer(null);setResults([]);setDiscovery([]);
    if(mode==="google")window.open(googleUrl(text,inferred),"_blank","noopener,noreferrer");
@@ -24,11 +23,22 @@ export default function SearchExperience(){
      if(mode==="ai"&&inferred==="all"&&web.results?.length){const evidence=web.results.slice(0,8).map((r,i)=>`${i+1}. ${r.title}\n${r.snippet||""}\n${r.url}`).join("\n\n");const a=await api<ChatResult>("/chat",{method:"POST",body:JSON.stringify({message:`Answer this query using the fresh public web evidence below. Do not invent facts. Query: ${text}\n\n${evidence}`})});setAnswer(a)}
    }catch(err){setError(err instanceof Error?err.message:"Search failed")}finally{setBusy(false)}
  }
- const quick=(q:string,c:string)=>{setQuery(q);setCategory(c);void runSearch(undefined,q,c)};const catLabel=CATEGORIES.find(c=>c.id===category)?.label||"All";
- return <section className="search-experience" aria-label="Manu AI search"><div className="search-topbar"><div className="search-brand"><span>M</span><strong>Manu</strong><b>AI</b></div><div className="search-top-actions"><button onClick={()=>setMode("google")} className={mode==="google"?"active":""}>Google</button><button onClick={()=>setMode("ai")} className={mode==="ai"?"active":""}>AI</button><div className="search-avatar">M</div></div></div>
- <main className="search-hero"><div className="search-kicker">PERSONAL SEARCH & DISCOVERY</div><h1>Manu<span>AI</span></h1><p>Search the web, discover media, and use your personal taste — from one box.</p><form className="global-search" onSubmit={runSearch}><span className="search-icon">⌕</span><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search anything…" aria-label="Search anything" autoFocus/><div className="mode-toggle"><button type="button" className={mode==="ai"?"active":""} onClick={()=>setMode("ai")}>✦ AI Search</button><i/><button type="button" className={mode==="google"?"active":""} onClick={()=>setMode("google")}>G Google</button></div><button className="global-submit" type="submit" disabled={busy}>{busy?"…":"→"}</button></form><div className="category-strip">{CATEGORIES.map(c=><button key={c.id} type="button" className={category===c.id?"active":""} onClick={()=>setCategory(c.id)}>{c.icon} {c.label}</button>)}</div><div className="search-hint">⌘ K to focus · choose a type for personalized cards</div></main>
- {error&&<div className="search-error">{error}</div>}
- {!searched?<div className="discovery-content">{localRecs.length>0&&<section className="taste-section"><div className="results-title"><div><span>YOUR TASTE</span><h2>Recommended for you</h2></div><button onClick={()=>quick("movies I should watch","movie")}>Explore movies →</button></div><div className="recommendation-grid-search">{localRecs.slice(0,6).map(r=><article className="taste-card" key={r.item.id}><div className="taste-poster">{r.item.image_url&&<img src={r.item.image_url} alt=""/>}</div><div className="taste-copy"><span className="match">{r.score}% <em>match</em></span><h3>{r.item.title}</h3><p>{r.item.genres||"Personal pick"}</p><small>{r.reasons?.[0]}</small></div></article>)}</div></section>}</div>:<div className="search-content">
+ const catLabel=CATEGORIES.find(c=>c.id===category)?.label||"All";
+ return <section className="search-experience cinema-search" aria-label="Manu AI search">
+ <header className="cinema-search-bar">
+   <form className="global-search" onSubmit={runSearch}>
+     <span className="search-icon" aria-hidden="true">⌕</span>
+     <input type="search" value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search titles or ask Manu" aria-label="Search titles or ask Manu"/>
+     <button className="global-submit" type="submit" disabled={busy} aria-label="Run search">{busy?"…":"→"}</button>
+   </form>
+   <label className="cinema-search-filter"><span>Search with</span><select value={mode} onChange={event=>setMode(event.target.value as Mode)}><option value="ai">Manu AI</option><option value="google">Google</option></select></label>
+   <label className="cinema-search-filter"><span>Category</span><select value={category} onChange={event=>setCategory(event.target.value)}>{CATEGORIES.map(({id,label})=><option key={id} value={id}>{label}</option>)}</select></label>
+   <a className="cinema-profile" href="/profile" aria-label="My AI profile">M</a>
+   {searched&&<button className="cinema-button" disabled={busy} onClick={()=>{setSearched(false);setError("")}}>Back to browse</button>}
+ </header>
+ {error&&<div className="search-error" role="alert">{error}</div>}
+ {!searched&&browse}
+ {searched&&<div className="search-content">
  {answer&&mode==="ai"&&<article className="search-ai-answer"><div className="answer-label">MANU AI · WEB-AUGMENTED</div><p>{answer.answer}</p>{answer.facts?.length?<div className="answer-facts">{answer.facts.slice(0,5).map(f=><span key={f}>✓ {f}</span>)}</div>:null}</article>}
  {discovery.length>0&&<section className="discovery-results"><div className="results-title"><div><span>PERSONALIZED {catLabel.toUpperCase()}</span><h2>{catLabel} matches for “{query}”</h2></div><div className="result-actions"><span>{discovery.length} cards</span><button onClick={()=>window.open(googleUrl(query,category),"_blank","noopener,noreferrer")}>Google ↗</button></div></div><div className="media-discovery-grid">{discovery.map(r=><DiscoveryCard key={`${r.item.id}-${r.item.title}`} result={r}/>)}</div></section>}
  <section className="web-results-block"><div className="results-title"><div><span>WEB RESULTS</span><h2>{results.length?`Results for “${query}”`:mode==="google"?"Google search opened":"No web results"}</h2></div>{mode==="google"&&<button onClick={()=>window.open(googleUrl(query,category),"_blank","noopener,noreferrer")}>Open Google ↗</button>}</div>{results.map(r=><a className="search-result-card" key={`${r.url}-${r.title}`} href={r.url} target="_blank" rel="noreferrer"><small>{(()=>{try{return new URL(r.url).hostname}catch{return r.url}})()}</small><h3>{r.title}</h3><p>{r.snippet||"Open result"}</p></a>)}{!results.length&&!discovery.length&&mode!=="google"&&<div className="no-results-card">No public results returned. Configure a web-search provider in your local environment or use Google.</div>}</section></div>}
