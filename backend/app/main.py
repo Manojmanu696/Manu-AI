@@ -150,6 +150,7 @@ def export_csv(dataset:str=Query("media"),db:Session=Depends(get_db)):
     rows=[serialize_media(i) for i in db.query(MediaItem).all()] if dataset=="media" else [serialize_memory(i) for i in db.query(Memory).all()];return StreamingResponse(iter([csv_text(rows)]),media_type="text/csv",headers={"Content-Disposition":f"attachment; filename=ManuAI_{dataset}.csv"})
 
 @app.get("/data/export/zip")
+@app.post("/data/export/zip")
 def export_zip(db:Session=Depends(get_db)):
     path=build_zip(db);return FileResponse(path,media_type="application/zip",filename=path.name)
 

@@ -6,8 +6,8 @@ type Memory={id:number;category:string;content:string;source:string;confidence:n
 export default function ProfilePage(){
  const [memories,setMemories]=useState<Memory[]>([]); const [loading,setLoading]=useState(true);
  const load=()=>fetch(`${API_URL}/memories`).then(r=>r.json()).then(setMemories).finally(()=>setLoading(false));
- useEffect(load,[]);
- const groups=useMemo(()=>memories.reduce<Record<string,Memory[]>>((a,m)=>(a[m.category]??=[]).push(m),{}),[memories]);
+ useEffect(()=>{void load()},[]);
+ const groups=useMemo(()=>memories.reduce<Record<string,Memory[]>>((groups,memory)=>{(groups[memory.category]??=[]).push(memory);return groups},{}),[memories]);
  const remove=async(id:number)=>{await fetch(`${API_URL}/memories/${id}`,{method:"DELETE"});load()};
  const confidence=(m:Memory)=>m.confidence==null?null:Math.round(m.confidence*100);
  return <main style={{maxWidth:1100,margin:"0 auto",padding:"56px 28px",fontFamily:"system-ui"}}>
