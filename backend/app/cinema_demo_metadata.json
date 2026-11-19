@@ -1,0 +1,727 @@
+{
+  "movie|2016|Arrival": {
+    "external_id": "tmdb:329865",
+    "source_url": "https://www.themoviedb.org/movie/329865",
+    "image_url": "https://image.tmdb.org/t/p/w500/pEzNVQfdzYDzVK0XqxERIw2x2se.jpg",
+    "cast": [
+      {
+        "name": "Amy Adams",
+        "role": "Louise Banks"
+      },
+      {
+        "name": "Jeremy Renner",
+        "role": "Ian Donnelly"
+      },
+      {
+        "name": "Forest Whitaker",
+        "role": "Colonel Weber"
+      },
+      {
+        "name": "Michael Stuhlbarg",
+        "role": "Agent Halpern"
+      },
+      {
+        "name": "Mark O'Brien",
+        "role": "Captain Marks"
+      },
+      {
+        "name": "Tzi Ma",
+        "role": "General Shang"
+      },
+      {
+        "name": "Abigail Pniowsky",
+        "role": "8-Year-Old Hannah"
+      },
+      {
+        "name": "Julia Scarlett Dan",
+        "role": "12-Year-Old Hannah"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Denis Villeneuve",
+        "role": "Director"
+      },
+      {
+        "name": "Eric Heisserer",
+        "role": "Screenplay"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/8MUZz7oPXQftFTslZpRP3CVMOoq.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=7W1m5ER3I1Y",
+    "release_label": "11/11/2016 (US) release"
+  },
+  "movie|2006|The Prestige": {
+    "external_id": "tmdb:1124",
+    "source_url": "https://www.themoviedb.org/movie/1124",
+    "image_url": "https://image.tmdb.org/t/p/w500/Ag2B2KHKQPukjH7WutmgnnSNurZ.jpg",
+    "cast": [
+      {
+        "name": "Hugh Jackman",
+        "role": "Robert Angier"
+      },
+      {
+        "name": "Christian Bale",
+        "role": "Alfred Borden"
+      },
+      {
+        "name": "Michael Caine",
+        "role": "Cutter"
+      },
+      {
+        "name": "Piper Perabo",
+        "role": "Julia McCullough"
+      },
+      {
+        "name": "Rebecca Hall",
+        "role": "Sarah"
+      },
+      {
+        "name": "Scarlett Johansson",
+        "role": "Olivia Wenscombe"
+      },
+      {
+        "name": "Samantha Mahurin",
+        "role": "Jess"
+      },
+      {
+        "name": "David Bowie",
+        "role": "Tesla"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Christopher Nolan",
+        "role": "Director, Screenplay"
+      },
+      {
+        "name": "Jonathan Nolan",
+        "role": "Screenplay"
+      },
+      {
+        "name": "Christopher Priest",
+        "role": "Novel"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/yaExZh6qE2cfyK3o4kAMEq0mkgy.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=ObGVA1WOqyE",
+    "release_label": "10/20/2006 (US) release"
+  },
+  "movie|2000|Memento": {
+    "external_id": "tmdb:77",
+    "source_url": "https://www.themoviedb.org/movie/77",
+    "image_url": "https://image.tmdb.org/t/p/w500/nzlv62aC0octS5AklAiWpXLX9Z0.jpg",
+    "cast": [
+      {
+        "name": "Guy Pearce",
+        "role": "Leonard"
+      },
+      {
+        "name": "Carrie-Anne Moss",
+        "role": "Natalie"
+      },
+      {
+        "name": "Joe Pantoliano",
+        "role": "Teddy"
+      },
+      {
+        "name": "Mark Boone Junior",
+        "role": "Burt"
+      },
+      {
+        "name": "Russ Fega",
+        "role": "Waiter"
+      },
+      {
+        "name": "Jorja Fox",
+        "role": "Leonard's Wife"
+      },
+      {
+        "name": "Stephen Tobolowsky",
+        "role": "Sammy"
+      },
+      {
+        "name": "Harriet Sansom Harris",
+        "role": "Mrs. Jankis"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Christopher Nolan",
+        "role": "Director, Screenplay"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/7Wev9JMo6R5XAfz2KDvXb7oPMmy.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=Wyc9TpJxf4A",
+    "release_label": "03/16/2001 (US) release"
+  },
+  "movie|2016|The Invisible Guest": {
+    "external_id": "tmdb:411088",
+    "source_url": "https://www.themoviedb.org/movie/411088",
+    "image_url": "https://image.tmdb.org/t/p/w500/fptnZJbLzKUHeNlYrAynbyoL5YJ.jpg",
+    "cast": [
+      {
+        "name": "Mario Casas",
+        "role": "Adrián Doria"
+      },
+      {
+        "name": "Ana Wagener",
+        "role": "Elvira"
+      },
+      {
+        "name": "Jose Coronado",
+        "role": "Tomás Garrido"
+      },
+      {
+        "name": "Bárbara Lennie",
+        "role": "Laura Vidal"
+      },
+      {
+        "name": "Francesc Orella",
+        "role": "Félix Leiva"
+      },
+      {
+        "name": "Paco Tous",
+        "role": "Driver"
+      },
+      {
+        "name": "David Selvas",
+        "role": "Bruno"
+      },
+      {
+        "name": "Iñigo Gastesi",
+        "role": "Daniel Garrido"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Oriol Paulo",
+        "role": "Director, Screenplay"
+      }
+    ],
+    "language": "Spanish",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/157QuwzU58D5RtXmkBl5iNaxigN.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=epCg2RbyF80",
+    "release_label": "09/23/2016 (US) release"
+  },
+  "movie|2013|Coherence": {
+    "external_id": "tmdb:220289",
+    "source_url": "https://www.themoviedb.org/movie/220289",
+    "image_url": "https://image.tmdb.org/t/p/w500/ezUtb9m5DeLwL2gxi4gktzNCvQv.jpg",
+    "cast": [
+      {
+        "name": "Emily Baldoni",
+        "role": "Em"
+      },
+      {
+        "name": "Maury Sterling",
+        "role": "Kevin"
+      },
+      {
+        "name": "Nicholas Brendon",
+        "role": "Mike"
+      },
+      {
+        "name": "Lauren Maher",
+        "role": "Laurie"
+      },
+      {
+        "name": "Elizabeth Gracen",
+        "role": "Beth"
+      },
+      {
+        "name": "Hugo Armstrong",
+        "role": "Hugh"
+      },
+      {
+        "name": "Lorene Scafaria",
+        "role": "Lee"
+      },
+      {
+        "name": "Alex Manugian",
+        "role": "Amir"
+      }
+    ],
+    "crew": [
+      {
+        "name": "James Ward Byrkit",
+        "role": "Director, Screenplay, Story"
+      },
+      {
+        "name": "Alex Manugian",
+        "role": "Story"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/cvGE73s935bXEAVt2W0zADPPegG.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=YixSld-6PqM",
+    "release_label": "09/19/2013 (US) release"
+  },
+  "movie|2013|Prisoners": {
+    "external_id": "tmdb:146233",
+    "source_url": "https://www.themoviedb.org/movie/146233",
+    "image_url": "https://image.tmdb.org/t/p/w500/uhviyknTT5cEQXbn6vWIqfM4vGm.jpg",
+    "cast": [
+      {
+        "name": "Hugh Jackman",
+        "role": "Keller Dover"
+      },
+      {
+        "name": "Jake Gyllenhaal",
+        "role": "Detective Loki"
+      },
+      {
+        "name": "Viola Davis",
+        "role": "Nancy Birch"
+      },
+      {
+        "name": "Maria Bello",
+        "role": "Grace Dover"
+      },
+      {
+        "name": "Terrence Howard",
+        "role": "Franklin Birch"
+      },
+      {
+        "name": "Melissa Leo",
+        "role": "Holly Jones"
+      },
+      {
+        "name": "Paul Dano",
+        "role": "Alex Jones"
+      },
+      {
+        "name": "Dylan Minnette",
+        "role": "Ralph Dover"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Denis Villeneuve",
+        "role": "Director"
+      },
+      {
+        "name": "Aaron Guzikowski",
+        "role": "Writer"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/3RFmTz5h2UuFWEV4oH00XICBR9y.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=yszyHq-S9W8",
+    "release_label": "09/20/2013 (US) release"
+  },
+  "tv|2022|Severance": {
+    "external_id": "tmdb:95396",
+    "source_url": "https://www.themoviedb.org/tv/95396",
+    "image_url": "https://image.tmdb.org/t/p/w500/pPHpeI2X1qEd1CS1SeyrdhZ4qnT.jpg",
+    "cast": [
+      {
+        "name": "Adam Scott",
+        "role": "Mark Scout"
+      },
+      {
+        "name": "Britt Lower",
+        "role": "Helly Riggs"
+      },
+      {
+        "name": "Tramell Tillman",
+        "role": "Seth Milchick"
+      },
+      {
+        "name": "Zach Cherry",
+        "role": "Dylan George"
+      },
+      {
+        "name": "Patricia Arquette",
+        "role": "Harmony Cobel"
+      },
+      {
+        "name": "Jen Tullock",
+        "role": "Devon Scout-Hale"
+      },
+      {
+        "name": "Dichen Lachman",
+        "role": "Ms. Casey"
+      },
+      {
+        "name": "John Turturro",
+        "role": "Irving Bailiff"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Dan Erickson",
+        "role": "Creator"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/ixgFmf1X59PUZam2qbAfskx2gQr.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=xEQP4VVuyrY"
+  },
+  "tv|2017|Dark": {
+    "external_id": "tmdb:70523",
+    "source_url": "https://www.themoviedb.org/tv/70523",
+    "image_url": "https://image.tmdb.org/t/p/w500/wiiyc3m6HKaQhFBYeuM7ySCNQsG.jpg",
+    "cast": [
+      {
+        "name": "Louis Hofmann",
+        "role": "Jonas Kahnwald"
+      },
+      {
+        "name": "Lisa Vicari",
+        "role": "Martha Nielsen"
+      },
+      {
+        "name": "Andreas Pietschmann",
+        "role": "The Stranger"
+      },
+      {
+        "name": "Maja Schöne",
+        "role": "Hannah Kahnwald"
+      },
+      {
+        "name": "Stephan Kampwirth",
+        "role": "Peter Doppler"
+      },
+      {
+        "name": "Paul Lux",
+        "role": "Bartosz Tiedemann"
+      },
+      {
+        "name": "Jördis Triebel",
+        "role": "Katharina Nielsen"
+      },
+      {
+        "name": "Karoline Eichhorn",
+        "role": "Charlotte Doppler"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Baran bo Odar",
+        "role": "Creator"
+      },
+      {
+        "name": "Jantje Friese",
+        "role": "Creator"
+      }
+    ],
+    "language": "German",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/3jDXL4Xvj3AzDOF6UH1xeyHW8MH.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=ESEUoa-mz2c"
+  },
+  "tv|2015|Mr. Robot": {
+    "external_id": "tmdb:62560",
+    "source_url": "https://www.themoviedb.org/tv/62560",
+    "image_url": "https://image.tmdb.org/t/p/w500/kv1nRqgebSsREnd7vdC2pSGjpLo.jpg",
+    "cast": [
+      {
+        "name": "Rami Malek",
+        "role": "Elliot Alderson"
+      },
+      {
+        "name": "Christian Slater",
+        "role": "Mr. Robot"
+      },
+      {
+        "name": "Carly Chaikin",
+        "role": "Darlene Alderson"
+      },
+      {
+        "name": "Martin Wallström",
+        "role": "Tyrell Wellick"
+      },
+      {
+        "name": "Portia Doubleday",
+        "role": "Angela Moss, Angela Moss (voice)"
+      },
+      {
+        "name": "Grace Gummer",
+        "role": "Dominique DiPierro"
+      },
+      {
+        "name": "Michael Cristofer",
+        "role": "Phillip Price, Phillip Price (voice)"
+      },
+      {
+        "name": "BD Wong",
+        "role": "Whiterose"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Sam Esmail",
+        "role": "Creator"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/uJUe985oIuRiD3hmHQYskIMc2WU.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=N6HGuJC--rk"
+  },
+  "tv|2022|The Devil's Hour": {
+    "external_id": "tmdb:157061",
+    "source_url": "https://www.themoviedb.org/tv/157061",
+    "image_url": "https://image.tmdb.org/t/p/w500/mFU6ZPAs6g8Y9Eld28GULJYt3rC.jpg",
+    "cast": [
+      {
+        "name": "Jessica Raine",
+        "role": "Lucy Chambers"
+      },
+      {
+        "name": "Peter Capaldi",
+        "role": "Gideon Shepherd"
+      },
+      {
+        "name": "Nikesh Patel",
+        "role": "DI Ravi Dhillon"
+      },
+      {
+        "name": "Phil Dunster",
+        "role": "Mike Stephens"
+      },
+      {
+        "name": "Benjamin Chivers",
+        "role": "Isaac Stephens"
+      },
+      {
+        "name": "Talia Walker Bassols",
+        "role": "Meredith Warren"
+      },
+      {
+        "name": "Rhiannon Harper-Rafferty",
+        "role": "Debbie Warren"
+      },
+      {
+        "name": "Alex Ferns",
+        "role": "Nick Holness, DS Nick Holness"
+      }
+    ],
+    "crew": [
+      {
+        "name": "Tom Moran",
+        "role": "Creator"
+      }
+    ],
+    "language": "English",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/31XWoLd3AHW6MLy9i2DSbFZOPuH.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=H5CCF39hIVw"
+  },
+  "anime|2004|Monster": {
+    "external_id": "tmdb:30981",
+    "source_url": "https://www.themoviedb.org/tv/30981",
+    "image_url": "https://image.tmdb.org/t/p/w500/n5XNKXnoXpoXyfiCtXHOf8q8PFM.jpg",
+    "cast": [
+      {
+        "name": "Hidenobu Kiuchi",
+        "role": "Guest D (voice), Waiter (voice), Tenma (voice), Student C (voice) and 1 more..."
+      },
+      {
+        "name": "Eiji Hanawa",
+        "role": "Criminal B (voice), Announcer (voice), Criminal 4 (voice), The Twins' Father (voice) and 32 more..."
+      },
+      {
+        "name": "Mamiko Noto",
+        "role": "Reporter (voice), Nurse B (voice), Nina (voice), Children (voice) and 3 more..."
+      },
+      {
+        "name": "Yasushi Miyabayashi",
+        "role": "Officer B (voice), Guest C (voice), Bodyguard (voice), Pimp (voice) and 27 more..."
+      },
+      {
+        "name": "Nozomu Sasaki",
+        "role": "Reporter B (voice), Subordinate B (voice), Criminal 3 (voice), Driver (voice) and 7 more..."
+      },
+      {
+        "name": "Shiho Kawaragi",
+        "role": "Young Grimmer (voice), Turkish Child (voice), Reporter (voice), Female Reporter (voice) and 11 more..."
+      },
+      {
+        "name": "Tsutomu Isobe",
+        "role": "Inspector Lunge (voice)"
+      },
+      {
+        "name": "Ichiro Nagai",
+        "role": "Dr. Reichwein (voice)"
+      }
+    ],
+    "crew": [],
+    "language": "Japanese",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/6T19aRp9zLMghZo1dTEwoNyreNZ.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=9aS-EgdAq6U"
+  },
+  "anime|2023|Frieren: Beyond Journey's End": {
+    "external_id": "tmdb:209867",
+    "source_url": "https://www.themoviedb.org/tv/209867",
+    "image_url": "https://image.tmdb.org/t/p/w500/dqZENchTd7lp5zht7BdlqM7RBhD.jpg",
+    "cast": [
+      {
+        "name": "Atsumi Tanezaki",
+        "role": "Frieren (voice)"
+      },
+      {
+        "name": "Kana Ichinose",
+        "role": "Fern (voice)"
+      },
+      {
+        "name": "Chiaki Kobayashi",
+        "role": "Stark (voice)"
+      },
+      {
+        "name": "Nobuhiko Okamoto",
+        "role": "Himmel (voice)"
+      },
+      {
+        "name": "Hiroki Touchi",
+        "role": "Heiter (voice)"
+      },
+      {
+        "name": "Yoji Ueda",
+        "role": "Eisen (voice)"
+      },
+      {
+        "name": "Masafumi Kobatake",
+        "role": "Aide-de-camp (voice), Villager (voice), Guard (voice), Magic Shop Owner (voice) and 7 more..."
+      },
+      {
+        "name": "Jiro Saito",
+        "role": "Denken (voice)"
+      }
+    ],
+    "crew": [],
+    "language": "Japanese",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=01WEqntM1NI"
+  },
+  "anime|2011|Steins;Gate": {
+    "external_id": "tmdb:42509",
+    "source_url": "https://www.themoviedb.org/tv/42509",
+    "image_url": "https://image.tmdb.org/t/p/w500/96R4bV7dB8ramaWceNKsxvJgCUd.jpg",
+    "cast": [
+      {
+        "name": "Mamoru Miyano",
+        "role": "Rintaro Okabe (voice)"
+      },
+      {
+        "name": "Asami Imai",
+        "role": "Kurisu Makise (voice)"
+      },
+      {
+        "name": "Kana Hanazawa",
+        "role": "Mayuri Shiina (voice)"
+      },
+      {
+        "name": "Tomokazu Seki",
+        "role": "Itaru Hashida (voice)"
+      },
+      {
+        "name": "Yukari Tamura",
+        "role": "Suzuha Amane (voice)"
+      },
+      {
+        "name": "Haruko Momoi",
+        "role": "Faris Nyan-Nyan (voice)"
+      },
+      {
+        "name": "Yu Kobayashi",
+        "role": "Luka Urushibara (voice)"
+      },
+      {
+        "name": "Saori Goto",
+        "role": "Moeka Kiryuu (voice)"
+      }
+    ],
+    "crew": [],
+    "language": "Japanese",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/36Ech63X2KU8JUXIBAo167kIC2k.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=uMYhjVwp0Fk"
+  },
+  "anime|2021|Odd Taxi": {
+    "external_id": "tmdb:116727",
+    "source_url": "https://www.themoviedb.org/tv/116727",
+    "image_url": "https://image.tmdb.org/t/p/w500/ztyo4gSDWuxV83png18W3Av2XNW.jpg",
+    "cast": [
+      {
+        "name": "Natsuki Hanae",
+        "role": "Hiroshi Odokawa (voice)"
+      },
+      {
+        "name": "Ryohei Kimura",
+        "role": "Ayumu Goriki (voice)"
+      },
+      {
+        "name": "Riho Iida",
+        "role": "Miho Shirakawa (voice)"
+      },
+      {
+        "name": "Takashi",
+        "role": "Taichi Kabasawa (voice)"
+      },
+      {
+        "name": "Kappei Yamaguchi",
+        "role": "Eiji Kakihana (voice)"
+      },
+      {
+        "name": "Kenji Hamada",
+        "role": "Dobu (voice)"
+      },
+      {
+        "name": "Koudai Sakai",
+        "role": "Imai (voice)"
+      },
+      {
+        "name": "Makoto Furukawa",
+        "role": "Fuyuki Yamamoto (voice)"
+      }
+    ],
+    "crew": [],
+    "language": "Japanese",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/m7RQ7l2FnCTEnH58Zm8SQzJGYQH.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=u2h_--ng8rk"
+  },
+  "anime|2023|Pluto": {
+    "external_id": "tmdb:91997",
+    "source_url": "https://www.themoviedb.org/tv/91997",
+    "image_url": "https://image.tmdb.org/t/p/w500/agf5sETjlO35s3EDA7wwGliZ5UW.jpg",
+    "cast": [
+      {
+        "name": "Shinshu Fuji",
+        "role": "Gesicht (voice)"
+      },
+      {
+        "name": "Toshio Furukawa",
+        "role": "Ocanomizu (voice)"
+      },
+      {
+        "name": "Yoko Hikasa",
+        "role": "Atom (voice)"
+      },
+      {
+        "name": "Yuuki Hoshi",
+        "role": "Mechanic (voice), Special Forces Member (voice), Judge (voice), Cleaning Staff (voice) and 2 more..."
+      },
+      {
+        "name": "Romi Park",
+        "role": "Helena (voice)"
+      },
+      {
+        "name": "Mamoru Miyano",
+        "role": "Epsilon (voice)"
+      },
+      {
+        "name": "Eizo Tsuda",
+        "role": "Tenma (voice)"
+      },
+      {
+        "name": "Hideyuki Tanaka",
+        "role": "Brau1589 (voice)"
+      }
+    ],
+    "crew": [],
+    "language": "Japanese",
+    "backdrop_url": "https://image.tmdb.org/t/p/w1280/oz3LT9glLNWpSQACnWlIYoSZA5M.jpg",
+    "trailer_url": "https://www.youtube.com/watch?v=9ez8lm9I26Y"
+  }
+}

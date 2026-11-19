@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from pydantic import BaseModel, Field, field_validator
 
 class MediaBase(BaseModel):
@@ -6,7 +6,7 @@ class MediaBase(BaseModel):
     title: str = Field(min_length=1, max_length=300); description: str = ""; genres: str = ""
     personal_rating: float | None = Field(default=None, ge=1, le=10)
     sentiment: str = Field(default="neutral", pattern="^(like|dislike|neutral)$")
-    status: str = Field(default="want", pattern="^(want|current|completed|dropped|on_hold)$")
+    status: str = Field(default="want", pattern="^(want|current|completed|dropped|on_hold|recommended)$")
     notes: str = ""; tags: str = ""; runtime: str = ""
     release_year: int | None = Field(default=None, ge=1800, le=2100)
     external_id: str = ""; external_url: str = ""; image_url: str = ""; ai_metadata: str = ""
@@ -51,3 +51,40 @@ class MemoryImportResponse(BaseModel): imported: list[MemoryOut]; summary: str
 class PersonalSnapshot(BaseModel):
     generated_at: datetime; explicit_memories: list[dict]; inferred_memories: list[dict]
     library: list[dict]; watchlist: list[dict]; instructions_for_chatgpt: str
+
+
+class CinemaStatus(BaseModel):
+    status: str = Field(pattern="^(recommended|want|current|completed|dropped|on_hold)$")
+
+
+class CheckpointCreate(BaseModel):
+    viewing_date: date
+    minute: int | None = Field(default=None, ge=0, le=10000)
+    season: int | None = Field(default=None, ge=0, le=1000)
+    episode: int | None = Field(default=None, ge=1, le=10000)
+    headline: str = Field(default="", max_length=160)
+    notes: str = Field(default="", max_length=10000)
+    feeling: str = Field(default="", max_length=100)
+    pacing: str = Field(default="", max_length=50)
+    rating: float | None = Field(default=None, ge=0, le=10)
+    rewatch: str = Field(default="", pattern="^(|yes|maybe|no)$")
+    tags: str = Field(default="", max_length=600)
+    spoiler: bool = False
+
+
+class ReviewCreate(BaseModel):
+    rating: float = Field(ge=1, le=10)
+    verdict: str = Field(min_length=1, max_length=240)
+    body: str = Field(min_length=1, max_length=20000)
+    tags: str = Field(default="", max_length=600)
+    spoiler_notes: str = Field(default="", max_length=20000)
+    spoiler: bool = False
+
+    @field_validator("verdict", "body", mode="before")
+    @classmethod
+    def strip_review_text(cls, value: str) -> str:
+        return value.strip() if isinstance(value, str) else value
+
+
+class ReviewDraftRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=20000)

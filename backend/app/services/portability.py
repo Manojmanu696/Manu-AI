@@ -2,10 +2,10 @@ import csv
 import io
 import json
 import zipfile
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from sqlalchemy.orm import Session
-from ..models import MediaItem, Memory
+from ..models import FilmReview, MediaItem, Memory, ViewingCheckpoint
 from ..config import BACKUP_DIR, DATA_DIR
 
 PORTABLE_VERSION = "1.0"
@@ -35,6 +35,15 @@ def export_payload(db: Session):
         "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "media_items": [serialize_media(item) for item in db.query(MediaItem).all()],
         "memories": [serialize_memory(memory) for memory in db.query(Memory).all()],
+        "viewing_checkpoints": [
+            {"media_item_id": row.media_item_id, "viewing_date": row.viewing_date.isoformat(), **row.details}
+            for row in db.query(ViewingCheckpoint).order_by(ViewingCheckpoint.viewing_date, ViewingCheckpoint.id)
+        ],
+        "film_reviews": [
+            {"media_item_id": row.media_item_id, "finalized_at": row.finalized_at.isoformat(),
+             "updated_at": row.updated_at.isoformat(), **row.details}
+            for row in db.query(FilmReview)
+        ],
     }
 
 
@@ -56,6 +65,8 @@ def build_zip(db: Session) -> Path:
         archive.writestr("manu-ai-data.json", json.dumps(payload, indent=2))
         archive.writestr("media-items.csv", csv_text(payload["media_items"]))
         archive.writestr("memories.csv", csv_text(payload["memories"]))
+        archive.writestr("viewing-checkpoints.csv", csv_text(payload["viewing_checkpoints"]))
+        archive.writestr("film-reviews.csv", csv_text(payload["film_reviews"]))
         archive.writestr("README.txt", "Manu AI portable backup v1.0. Import this ZIP with Manu AI's Data page.\n")
     return path
 
@@ -70,11 +81,28 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
     if replace:
         db.query(MediaItem).delete()
         db.query(Memory).delete()
+    id_map = {}
     for raw in payload.get("media_items", []):
         values = {key: raw.get(key) for key in ("media_type","title","description","genres","personal_rating","sentiment","status","notes","tags","runtime","release_year","external_id","external_url","image_url","ai_metadata","is_demo")}
         values["date_added"] = _parse_date(raw.get("date_added")) or datetime.now(timezone.utc).replace(tzinfo=None)
         values["date_completed"] = _parse_date(raw.get("date_completed"))
-        db.add(MediaItem(**values))
+        if replace and type(raw.get("id")) is int and raw["id"] > 0:
+            values["id"] = raw["id"]
+        item = MediaItem(**values)
+        db.add(item)
+        id_map[raw.get("id")] = item
+    db.flush()
+    for raw in payload.get("viewing_checkpoints", []):
+        item = id_map.get(raw["media_item_id"])
+        if item is not None:
+            details = {key: value for key, value in raw.items() if key not in {"media_item_id", "viewing_date"}}
+            db.add(ViewingCheckpoint(media_item_id=item.id, viewing_date=date.fromisoformat(raw["viewing_date"]), details=details))
+    for raw in payload.get("film_reviews", []):
+        item = id_map.get(raw["media_item_id"])
+        if item is not None:
+            details = {key: value for key, value in raw.items() if key not in {"media_item_id", "finalized_at", "updated_at"}}
+            db.add(FilmReview(media_item_id=item.id, finalized_at=_parse_date(raw["finalized_at"]),
+                              updated_at=_parse_date(raw["updated_at"]), details=details))
     for raw in payload.get("memories", []):
         values = {key: raw.get(key) for key in ("category","content","source","confidence","is_demo")}
         values["created_at"] = _parse_date(raw.get("created_at")) or datetime.now(timezone.utc).replace(tzinfo=None)

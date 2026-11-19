@@ -27,7 +27,7 @@ def _taste(db: Session):
     history = db.query(MediaItem).all()
     memories = db.query(Memory).all()
     liked = [x for x in history if (x.personal_rating or 0) >= 8 or x.sentiment == "like" or x.status == "completed"]
-    disliked = [x for x in history if (x.personal_rating or 0) <= 5 or x.sentiment == "dislike" or x.status == "dropped"]
+    disliked = [x for x in history if (x.personal_rating is not None and x.personal_rating <= 5) or x.sentiment == "dislike" or x.status == "dropped"]
     liked_genres = Counter(g for x in liked for g in _terms(x.genres))
     liked_tags = Counter(t for x in liked for t in _terms(x.tags))
     disliked_genres = Counter(g for x in disliked for g in _terms(x.genres))

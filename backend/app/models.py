@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
-from sqlalchemy import DateTime, Float, ForeignKey, Integer, String, Text, Boolean
+from datetime import date, datetime, timezone
+from sqlalchemy import Date, DateTime, JSON, Float, ForeignKey, Integer, String, Text, Boolean
 from sqlalchemy.orm import Mapped, mapped_column
 from .database import Base
 
@@ -90,3 +90,19 @@ class ResearchSource(Base):
     title: Mapped[str] = mapped_column(String(500), default="")
     url: Mapped[str] = mapped_column(String(1000))
     retrieved_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+
+
+class ViewingCheckpoint(Base):
+    __tablename__ = "viewing_checkpoints"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
+    viewing_date: Mapped[date] = mapped_column(Date)
+    details: Mapped[dict] = mapped_column(JSON)
+
+
+class FilmReview(Base):
+    __tablename__ = "film_reviews"
+    media_item_id: Mapped[int] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), primary_key=True)
+    finalized_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
+    details: Mapped[dict] = mapped_column(JSON)

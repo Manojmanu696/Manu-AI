@@ -185,7 +185,7 @@ export default function HomeV2() {
                     <div className={styles.resultsHead}><div><span>SEARCH RESULTS</span><h2>{query}</h2></div><span>{results.length} results</span></div>
                     {mode === "ai" && answer && <article className={styles.aiCard}>
                       <div className={styles.cardLabel}>MANU AI · {answer.mode || "LOCAL"}</div>
-                      <h3>Manu's answer</h3>
+                      <h3>Manu’s answer</h3>
                       <p className={styles.answer}>{answer.answer}</p>
                       {answer.recommendations?.length ? <div className={styles.recommendations}><b>Recommended</b><div>{answer.recommendations.slice(0, 6).map((r) => <span key={r.title}>{r.title}</span>)}</div></div> : null}
                     </article>}

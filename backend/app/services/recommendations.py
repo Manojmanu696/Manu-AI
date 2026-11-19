@@ -10,7 +10,7 @@ def _terms(value: str | None) -> set[str]:
 def score_candidate(candidate: MediaItem, history: list[MediaItem], memories: list[Memory]):
     score, reasons = 45, []
     liked = [i for i in history if (i.personal_rating or 0) >= 8 or i.sentiment == "like" or i.status == "completed"]
-    disliked = [i for i in history if (i.personal_rating or 0) <= 5 or i.sentiment == "dislike" or i.status == "dropped"]
+    disliked = [i for i in history if (i.personal_rating is not None and i.personal_rating <= 5) or i.sentiment == "dislike" or i.status == "dropped"]
     genres, tags = _terms(candidate.genres), _terms(candidate.tags)
     liked_genres = Counter(g for i in liked for g in _terms(i.genres))
     liked_tags = Counter(t for i in liked for t in _terms(i.tags))
@@ -38,7 +38,7 @@ def score_candidate(candidate: MediaItem, history: list[MediaItem], memories: li
 
 def recommendations(db, media_type: str | None = None, limit: int = 12):
     all_items = db.query(MediaItem).all()
-    candidates = [i for i in all_items if i.status in {"want", "on_hold"} and (not media_type or i.media_type == media_type)]
+    candidates = [i for i in all_items if i.status in {"want", "on_hold", "recommended"} and (not media_type or i.media_type == media_type)]
     memories = db.query(Memory).all()
     results = []
     for item in candidates:

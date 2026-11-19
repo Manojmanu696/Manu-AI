@@ -5,8 +5,9 @@ import "./cinematic.css";
 import "./bridge.css";
 import "./google-home.css";
 import "./manu-modern.css";
+import "./cut.css";
 
-export const metadata: Metadata = { title: "Manu AI — Personal Discovery Intelligence", description: "Search the web, discover media, and use your personal taste — from one box." };
+export const metadata: Metadata = { title: "Manu’s Cut", description: "Discover films, series and anime, and keep a personal viewing journal." };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <html lang="en"><body>{children}</body></html>;

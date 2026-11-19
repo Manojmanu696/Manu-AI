@@ -6,7 +6,13 @@ export type Recommendation = { item:MediaItem; score:number; reasons:string[] };
 
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`${API_URL}${path}`, { ...options, headers: { "Content-Type": "application/json", ...(options?.headers || {}) } });
-  if (!response.ok) throw new Error((await response.json().catch(() => ({detail: "Request failed"}))).detail || "Request failed");
+  if (!response.ok) {
+    const { detail } = await response.json().catch(() => ({}));
+    const message = typeof detail === "string" ? detail
+      : Array.isArray(detail) ? detail.map(issue => `${issue.loc?.at(-1) || "Input"}: ${issue.msg}`).join(". ")
+      : "Request failed";
+    throw new Error(message);
+  }
   return response.status === 204 ? undefined as T : response.json();
 }
 

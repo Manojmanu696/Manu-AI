@@ -1,13 +1,13 @@
 # Manu AI
 
-Manu AI is a private, local-first dashboard for remembering what you watch, read, and play—and discovering what might fit your taste next. Your library lives in a SQLite file on your Mac, not in a required cloud service.
+Manu’s Cut is the film, TV and anime home for Manu AI. Browse recommendations, track your watchlist, and keep a private viewing journal and final reviews in the existing local SQLite library. Games, books, web search, memory, and the assistant are available under **Manu AI tools**.
 
 ## Start it (one command)
 
 You need **Python 3.11+** and **Node.js 20+**. In Terminal:
 
 ```bash
-cd /Users/manoj/CodeX
+cd Manu-AI
 chmod +x start.sh
 ./start.sh
 ```
@@ -16,13 +16,15 @@ Then open [http://localhost:3000](http://localhost:3000). The first run download
 
 ## First use
 
-Choose **Load demo data** to see the dashboard populated with clearly marked examples, or use **Add to library** to start with your own media. You can delete demo data at any time from **Data**.
+Use **Discover** to search the local catalogue, **My Library → Add a title** to enter your own, or **Load sample library** on an empty home to try the journal with sample records. To remove sample library records, use `DELETE /demo` in the local API docs.
+
+Set `TMDB_API_KEY` in `.env` for public title search and live catalogue details, including regional streaming data. If a local Ollama model is running, the review editor can suggest a draft that you can revise before finalizing. See the [desktop and mobile comparison](docs/manus-cut/README.md).
 
 ## Back up and restore
 
-Open **Data** in the app and select **Download complete backup**. This creates a portable ZIP containing JSON, CSV files, and a short readme. Keep it anywhere you like, including a folder synced by Google Drive, iCloud Drive, or Dropbox.
+Open the local API docs and use `GET /data/export/zip` to download a portable backup. It includes the library, memories, checkpoints, and final reviews in JSON and CSV.
 
-To restore on this or another Mac, open **Data**, choose the backup ZIP (or JSON), then choose whether to merge it with your library or replace it. Replacing is always confirmed first.
+To restore, upload the ZIP or JSON to `POST /data/import` in the local API docs. Leave `replace` off to keep existing records, or set it to `true` to replace the current library with the backup.
 
 ## Optional OpenAI configuration
 
