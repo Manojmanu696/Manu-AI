@@ -1,9 +1,10 @@
 "use client";
 import Link from "next/link";
 import { Icon } from "./icons";
-export const nav = [["home","Home"],["discover","Discover"],["movie","Movies"],["anime","Anime"],["tv","TV Shows"],["game","Games"],["book","Books"],["library","My Library"],["memory","Memory"],["data","Data"],["ai","AI"],["settings","Settings"]];
+export const nav = [["home","Home"],["top50","Top 50"],["discover","Discover"],["movie","Movies"],["anime","Anime"],["tv","TV Shows"],["game","Games"],["book","Books"],["library","My Library"],["memory","Memory"],["data","Data"],["ai","AI"],["settings","Settings"]];
 const routes: Record<string, string> = {
   home: "/",
+  top50: "/top-50",
   discover: "/browse/discover",
   movie: "/browse/movies",
   anime: "/browse/anime",
@@ -19,7 +20,7 @@ export function Sidebar({ active }: { active: string }) {
         <Link key={id} href={routes[id] ?? `/?view=${id}`} aria-label={label} title={label}
           aria-current={active === id ? "page" : undefined}
           className={`nav-item ${active === id ? "active" : ""} ${id === "memory" ? "nav-split" : ""}`}>
-          <Icon name={id === "library" ? "book" : id}/><span>{label}</span>
+          <Icon name={id === "top50" ? "discover" : id === "library" ? "book" : id}/><span>{label}</span>
         </Link>
       ))}
       <a className="nav-item bridge-link" href="/memory-bridge" aria-label="ChatGPT Bridge" title="ChatGPT Bridge"><Icon name="memory"/><span>ChatGPT Bridge</span></a>

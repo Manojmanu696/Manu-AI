@@ -1,0 +1,758 @@
+{
+  "Movies": [
+    {
+      "title": "The Prestige",
+      "year": 2006,
+      "note": "Rival magicians turn every performance into a strategic move. Watch how each man reacts to losing."
+    },
+    {
+      "title": "The Invisible Guest",
+      "year": 2016,
+      "note": "A suspect briefs his lawyer against the clock. Every revision changes which explanation you can trust."
+    },
+    {
+      "title": "The Departed",
+      "year": 2006,
+      "note": "Two moles hunt each other from opposite sides. The double pursuit scratches the Light-versus-L itch."
+    },
+    {
+      "title": "Edge of Tomorrow",
+      "year": 2014,
+      "note": "A soldier repeats one disastrous battle. Each death buys information, so progress feels earned like a tough game."
+    },
+    {
+      "title": "The Dark Knight",
+      "year": 2008,
+      "note": "Batman faces an opponent who plans around his moral code. The opening robbery sets the pace."
+    },
+    {
+      "title": "Memento",
+      "year": 2000,
+      "note": "A man investigates using notes he left himself. Tracking what he can actually know is the puzzle."
+    },
+    {
+      "title": "Inception",
+      "year": 2010,
+      "note": "A heist crew must coordinate across layers of dreams. The rules matter to the final operation."
+    },
+    {
+      "title": "Knives Out",
+      "year": 2019,
+      "note": "A detective questions a wealthy family after a death. Suspect motives are entertaining from the first interviews."
+    },
+    {
+      "title": "Inside Man",
+      "year": 2006,
+      "note": "A bank robber and a hostage negotiator trade moves. The question is what the robber really wants."
+    },
+    {
+      "title": "Source Code",
+      "year": 2011,
+      "note": "Eight minutes aboard a train are all an investigator gets. Each replay eliminates a different theory."
+    },
+    {
+      "title": "Shutter Island",
+      "year": 2010,
+      "note": "A missing patient brings two marshals to an isolated hospital. The investigation rewards close attention."
+    },
+    {
+      "title": "Se7en",
+      "year": 1995,
+      "note": "Two detectives follow a killer's deliberate pattern. Particularly grim even by crime-thriller standards."
+    },
+    {
+      "title": "Minority Report",
+      "year": 2002,
+      "note": "A detective who arrests future killers becomes a suspect. The chase puts the system's logic under pressure."
+    },
+    {
+      "title": "Drishyam",
+      "year": 2013,
+      "note": "A family man anticipates a police investigation. Allow time for the domestic setup before the chess match."
+    },
+    {
+      "title": "Searching",
+      "year": 2018,
+      "note": "A father searches his daughter's digital trail. Tiny details on screens become clues you can spot yourself."
+    },
+    {
+      "title": "The Game",
+      "year": 1997,
+      "note": "A banker accepts an unusual birthday gift. The fun is testing where the game's rules end."
+    },
+    {
+      "title": "The Bourne Identity",
+      "year": 2002,
+      "note": "An amnesiac pieces together his training while being hunted. His choices show his intelligence."
+    },
+    {
+      "title": "Prisoners",
+      "year": 2013,
+      "note": "A disappearance pits a father's certainty against a detective's method. Tense but deliberately paced."
+    },
+    {
+      "title": "The Usual Suspects",
+      "year": 1995,
+      "note": "An interrogation reconstructs a criminal operation. Pay attention to who controls the telling."
+    },
+    {
+      "title": "The Fugitive",
+      "year": 1993,
+      "note": "A surgeon must investigate a murder while evading a marshal. Both sides make credible moves."
+    },
+    {
+      "title": "Mission: Impossible – Fallout",
+      "year": 2018,
+      "note": "A failed exchange forces a team to improvise. Best after Rogue Nation for the character stakes."
+    },
+    {
+      "title": "Captain America: The Winter Soldier",
+      "year": 2014,
+      "note": "A trusted institution becomes the mystery. A strong fit for your love of Avengers-era team dynamics."
+    },
+    {
+      "title": "The Matrix",
+      "year": 1999,
+      "note": "A hacker suspects reality has hidden rules. Discovering them changes what the hero can do."
+    },
+    {
+      "title": "Predestination",
+      "year": 2014,
+      "note": "A time agent pursues a bomber. The dialogue-heavy middle asks you to build a timeline."
+    },
+    {
+      "title": "Looper",
+      "year": 2012,
+      "note": "An assassin's next target is his future self. Competing agendas make the time rules personal."
+    },
+    {
+      "title": "Coherence",
+      "year": 2013,
+      "note": "A dinner party notices something wrong outside. Small continuity details do most of the storytelling."
+    },
+    {
+      "title": "The Terminator",
+      "year": 1984,
+      "note": "A woman is hunted for something that hasn't happened yet. Lean pursuit with a clear objective."
+    },
+    {
+      "title": "Sicario",
+      "year": 2015,
+      "note": "An FBI agent joins an opaque operation. Watch who receives information and who gives orders."
+    },
+    {
+      "title": "Heat",
+      "year": 1995,
+      "note": "A detective and a thief study each other's routines. Long character scenes buy a strong confrontation."
+    },
+    {
+      "title": "Collateral",
+      "year": 2004,
+      "note": "A cab driver must survive a night with a contract killer. A tight deadline keeps it moving."
+    },
+    {
+      "title": "Speed",
+      "year": 1994,
+      "note": "Passengers must keep a bus above a speed threshold. The simple rule drives inventive problem-solving."
+    },
+    {
+      "title": "Train to Busan",
+      "year": 2016,
+      "note": "A train becomes a sequence of survival problems. Alliances matter as much as the threat."
+    },
+    {
+      "title": "Raiders of the Lost Ark",
+      "year": 1981,
+      "note": "An archaeologist races rivals to an artefact. Clear objectives and physical puzzles suit your adventure-game taste."
+    },
+    {
+      "title": "The Raid",
+      "year": 2011,
+      "note": "A police unit becomes trapped inside a tower. Floor-by-floor combat has the precision you liked in Sifu."
+    },
+    {
+      "title": "Upgrade",
+      "year": 2018,
+      "note": "An implant gives an injured man unusual abilities. Control of the body becomes the central question."
+    },
+    {
+      "title": "Dredd",
+      "year": 2012,
+      "note": "Two judges must fight their way out of a sealed tower. Short, brutal and objective-driven."
+    },
+    {
+      "title": "Nightcrawler",
+      "year": 2014,
+      "note": "A freelance crime cameraman learns how to manipulate a market. The strategist is unsettling to follow."
+    },
+    {
+      "title": "Gone Girl",
+      "year": 2014,
+      "note": "A disappearance plays out under public scrutiny. Perception becomes a tool in the investigation."
+    },
+    {
+      "title": "L.A. Confidential",
+      "year": 1997,
+      "note": "Three detectives pursue overlapping cases. Their conflicting methods give the conspiracy texture."
+    },
+    {
+      "title": "The Negotiator",
+      "year": 1998,
+      "note": "A framed negotiator takes hostages to buy time. The verbal duel is the draw."
+    },
+    {
+      "title": "Vikram Vedha",
+      "year": 2017,
+      "note": "A gangster tests a cop with stories and choices. Moral deductions replace a straightforward chase."
+    },
+    {
+      "title": "Kahaani",
+      "year": 2012,
+      "note": "A woman hunts for her missing husband in Kolkata. The city itself supplies clues and misdirection."
+    },
+    {
+      "title": "Andhadhun",
+      "year": 2018,
+      "note": "A pianist witnesses something dangerous. Dark comedy keeps reshuffling who holds the advantage."
+    },
+    {
+      "title": "A Wednesday!",
+      "year": 2008,
+      "note": "A caller forces officials into a timed negotiation. A compact contest of information and leverage."
+    },
+    {
+      "title": "Kaithi",
+      "year": 2019,
+      "note": "A former prisoner must transport injured officers through the night. One mission ties the action together."
+    },
+    {
+      "title": "Vikram",
+      "year": 2022,
+      "note": "An investigator follows a pattern of killings. Watch after Kaithi for the shared-world payoff."
+    },
+    {
+      "title": "The Batman",
+      "year": 2022,
+      "note": "A masked killer leaves riddles for Batman. Strong Arkham atmosphere, with a long and moody runtime."
+    },
+    {
+      "title": "The Martian",
+      "year": 2015,
+      "note": "A stranded astronaut solves one survival constraint at a time. Competence drives the suspense."
+    },
+    {
+      "title": "Dunkirk",
+      "year": 2017,
+      "note": "An evacuation unfolds on three time scales. The puzzle is how the timelines converge."
+    },
+    {
+      "title": "The Hunt for Red October",
+      "year": 1990,
+      "note": "Analysts must infer a submarine commander's intentions. Strategy carries more weight than explosions."
+    }
+  ],
+  "Series": [
+    {
+      "title": "Prison Break",
+      "year": 2005,
+      "note": "A planned escape begins with deliberate imprisonment. Season one pays off careful preparation."
+    },
+    {
+      "title": "Alice in Borderland",
+      "year": 2020,
+      "note": "Players decode lethal games in an empty Tokyo. Each rule set invites you to solve along."
+    },
+    {
+      "title": "Sherlock",
+      "year": 2010,
+      "note": "Modern London becomes a sequence of deduction contests. Feature-length episodes give each puzzle room."
+    },
+    {
+      "title": "Mr. Robot",
+      "year": 2015,
+      "note": "A hacker enters a conspiracy larger than his first target. Question what his perspective leaves out."
+    },
+    {
+      "title": "Money Heist",
+      "year": 2017,
+      "note": "A mastermind directs a robbery from outside. Hostage dynamics continually disrupt the plan."
+    },
+    {
+      "title": "Severance",
+      "year": 2022,
+      "note": "Workers cannot remember their lives outside the office. An immediate mystery with a measured reveal."
+    },
+    {
+      "title": "Dark",
+      "year": 2017,
+      "note": "A disappearance connects families across generations. Best when you can track names closely."
+    },
+    {
+      "title": "Bodyguard",
+      "year": 2018,
+      "note": "A protection officer must guard a politician he distrusts. The opening train encounter is the hook."
+    },
+    {
+      "title": "Person of Interest",
+      "year": 2011,
+      "note": "A machine predicts people in danger. Early standalone cases gradually build a larger strategic conflict."
+    },
+    {
+      "title": "24",
+      "year": 2001,
+      "note": "A counterterrorism agent races a real-time clock. Parallel crises make episodes easy to chain."
+    },
+    {
+      "title": "The Night Of",
+      "year": 2016,
+      "note": "One night turns a student into a murder suspect. Procedural detail matters more than action."
+    },
+    {
+      "title": "Line of Duty",
+      "year": 2012,
+      "note": "Investigators probe corruption inside the police. Interview-room reversals are the main attraction."
+    },
+    {
+      "title": "Squid Game",
+      "year": 2021,
+      "note": "Debt-ridden contestants enter deadly children's games. Alliances turn simple rules into strategy."
+    },
+    {
+      "title": "Luther",
+      "year": 2010,
+      "note": "A gifted detective takes dangerous personal risks. Some cases reveal the culprit and make pursuit the puzzle."
+    },
+    {
+      "title": "Hannibal",
+      "year": 2013,
+      "note": "A profiler consults a psychiatrist with hidden motives. A psychological duel with graphic imagery."
+    },
+    {
+      "title": "Breaking Bad",
+      "year": 2008,
+      "note": "A chemistry teacher builds a criminal enterprise. Each attempted solution creates a harder problem."
+    },
+    {
+      "title": "The Boys",
+      "year": 2019,
+      "note": "An ordinary man joins a group investigating corporate superheroes. A brutal inversion of Avengers teamwork."
+    },
+    {
+      "title": "Andor",
+      "year": 2022,
+      "note": "A thief is pulled into an emerging rebellion. Its patient opening earns a political payoff."
+    },
+    {
+      "title": "Shōgun",
+      "year": 2024,
+      "note": "A foreign pilot enters a Japanese power struggle. Alliances and translation both become strategic weapons."
+    },
+    {
+      "title": "Black Sails",
+      "year": 2014,
+      "note": "Pirates negotiate control of a vulnerable port. Political manoeuvring rewards patience past the opening episodes."
+    },
+    {
+      "title": "The Last Kingdom",
+      "year": 2015,
+      "note": "A warrior raised between cultures chooses shifting allegiances. Strong fit for your Kingdom Come interest."
+    },
+    {
+      "title": "Rome",
+      "year": 2005,
+      "note": "Soldiers and politicians navigate a collapsing republic. Personal decisions alter the political board."
+    },
+    {
+      "title": "The Expanse",
+      "year": 2015,
+      "note": "A missing-person case pulls rival powers toward conflict. Dense setup leads to faction-level stakes."
+    },
+    {
+      "title": "Silo",
+      "year": 2023,
+      "note": "An engineer probes the rules of an underground society. The world itself is the mystery."
+    },
+    {
+      "title": "Slow Horses",
+      "year": 2022,
+      "note": "Disgraced spies stumble into operational trouble. Dry humour and practical tradecraft drive the reversals."
+    },
+    {
+      "title": "The Capture",
+      "year": 2019,
+      "note": "Video evidence appears to contradict a suspect. The investigation keeps challenging what counts as proof."
+    },
+    {
+      "title": "The Day of the Jackal",
+      "year": 2024,
+      "note": "An investigator tracks an elusive assassin. Preparation and countermeasures carry the chase."
+    },
+    {
+      "title": "The Night Manager",
+      "year": 2016,
+      "note": "A hotel manager infiltrates an arms dealer's circle. Every new privilege increases exposure."
+    },
+    {
+      "title": "Reacher",
+      "year": 2022,
+      "note": "A drifter investigates a killing in a hostile town. Combines deductions with decisive fights."
+    },
+    {
+      "title": "Banshee",
+      "year": 2013,
+      "note": "An ex-con assumes a sheriff's identity. A fast hook and constant risk of exposure."
+    },
+    {
+      "title": "Warrior",
+      "year": 2019,
+      "note": "A fighter arrives in a city divided by rival factions. Martial skill and street politics both count."
+    },
+    {
+      "title": "Gangs of London",
+      "year": 2020,
+      "note": "A power vacuum destabilizes London crime families. Violent succession politics give it a Thrones edge."
+    },
+    {
+      "title": "Peaky Blinders",
+      "year": 2013,
+      "note": "A gang leader expands his influence in Birmingham. Watch how business deals double as traps."
+    },
+    {
+      "title": "Fargo",
+      "year": 2014,
+      "note": "A stranger disrupts a small-town investigation. Start with season one for tightly escalating consequences."
+    },
+    {
+      "title": "True Detective",
+      "year": 2014,
+      "note": "Two detectives revisit a disturbing Louisiana case. Start with season one and expect a deliberate pace."
+    },
+    {
+      "title": "Mindhunter",
+      "year": 2017,
+      "note": "Agents develop criminal profiling through interviews. Excellent for reading opponents, with limited closure."
+    },
+    {
+      "title": "Broadchurch",
+      "year": 2013,
+      "note": "A coastal town investigates a child's death. Strong suspect puzzle with a heavy emotional focus."
+    },
+    {
+      "title": "The Fall",
+      "year": 2013,
+      "note": "Detective and killer manoeuvre in parallel. Suspense comes from closing the distance."
+    },
+    {
+      "title": "The Americans",
+      "year": 2013,
+      "note": "Undercover spies balance missions with family life. Patient tradecraft is the payoff."
+    },
+    {
+      "title": "Homeland",
+      "year": 2011,
+      "note": "An analyst suspects a returning soldier. Season one plays suspicion against incomplete evidence."
+    },
+    {
+      "title": "Counterpart",
+      "year": 2017,
+      "note": "A bureaucrat discovers a parallel side to his agency. Espionage becomes a puzzle about identity."
+    },
+    {
+      "title": "Fringe",
+      "year": 2008,
+      "note": "An FBI team investigates impossible events. Standalone cases precede the larger mythology."
+    },
+    {
+      "title": "Lost",
+      "year": 2004,
+      "note": "Survivors confront an island full of unexplained events. The pilot hooks fast, though answers take time."
+    },
+    {
+      "title": "Travelers",
+      "year": 2016,
+      "note": "Agents inhabit people in the past to alter the future. Missions collide with their hosts' lives."
+    },
+    {
+      "title": "12 Monkeys",
+      "year": 2015,
+      "note": "A time traveller hunts the source of a plague. Long-range plotting rewards watching in order."
+    },
+    {
+      "title": "Orphan Black",
+      "year": 2013,
+      "note": "A woman sees a stranger with her own face. The identity puzzle starts in episode one."
+    },
+    {
+      "title": "Utopia",
+      "year": 2013,
+      "note": "Fans of a graphic novel stumble into a conspiracy. Choose the British original for its unsettling pursuit."
+    },
+    {
+      "title": "Kingdom",
+      "year": 2019,
+      "note": "A Korean prince faces court intrigue during an outbreak. Palace strategy and survival reinforce each other."
+    },
+    {
+      "title": "The Devil’s Plan",
+      "year": 2023,
+      "note": "Contestants build alliances in logic games. A reality competition for the part of you that likes watching plans work."
+    },
+    {
+      "title": "The Queen’s Gambit",
+      "year": 2020,
+      "note": "A prodigy learns to read opponents over the chessboard. Character drama occupies as much time as competition."
+    }
+  ],
+  "Anime": [
+    {
+      "title": "Code Geass",
+      "year": 2006,
+      "note": "A strategist gains the power to command obedience. Closest match to your mix of Death Note tactics and Attack on Titan rebellion."
+    },
+    {
+      "title": "The Promised Neverland",
+      "year": 2019,
+      "note": "Children uncover a secret and plan under surveillance. Season one is the strongest fit."
+    },
+    {
+      "title": "Kaiji: Ultimate Survivor",
+      "year": 2007,
+      "note": "A debtor faces games built around trust and betrayal. Every rule matters, though decisions can stretch over episodes."
+    },
+    {
+      "title": "Psycho-Pass",
+      "year": 2012,
+      "note": "Police operate under a system that predicts criminal intent. Season one pits competing ideas of justice against each other."
+    },
+    {
+      "title": "Erased",
+      "year": 2016,
+      "note": "A man returns to childhood with a crime to prevent. The premise and deadline arrive early."
+    },
+    {
+      "title": "Summer Time Rendering",
+      "year": 2022,
+      "note": "A funeral draws a young man back to an island. Each discovery changes his survival strategy."
+    },
+    {
+      "title": "Parasyte: The Maxim",
+      "year": 2014,
+      "note": "A teenager must cooperate with a parasite to survive. Fast escalation and competing loyalties suit your taste."
+    },
+    {
+      "title": "One Outs",
+      "year": 2008,
+      "note": "A pitcher turns baseball into psychological warfare. Read each at-bat as a duel over incentives."
+    },
+    {
+      "title": "Terror in Resonance",
+      "year": 2014,
+      "note": "Cryptic challenges draw a detective into pursuit. Short and built around a contest of deduction."
+    },
+    {
+      "title": "Fullmetal Alchemist: Brotherhood",
+      "year": 2009,
+      "note": "Two brothers pursue a cure and uncover a state conspiracy. Strong long-term payoff."
+    },
+    {
+      "title": "Hunter × Hunter",
+      "year": 2011,
+      "note": "A boy enters a dangerous qualification exam. Later fights reward interpreting rules better than an opponent."
+    },
+    {
+      "title": "Fate/Zero",
+      "year": 2011,
+      "note": "Rival teams compete in a secret war. Competing objectives make alliances unstable after a dense opener."
+    },
+    {
+      "title": "Steins;Gate",
+      "year": 2011,
+      "note": "Experiments with messages to the past acquire consequences. Excellent payoff if you tolerate a slow opening stretch."
+    },
+    {
+      "title": "ID: INVADED",
+      "year": 2020,
+      "note": "Detectives enter fragmented mental worlds to investigate killings. Each environment is a deduction puzzle."
+    },
+    {
+      "title": "Death Parade",
+      "year": 2015,
+      "note": "Strangers play games under opaque conditions. Psychological pressure matters more than winning."
+    },
+    {
+      "title": "Moriarty the Patriot",
+      "year": 2020,
+      "note": "A strategist uses crime against Britain's class system. The appeal is watching a plan take shape."
+    },
+    {
+      "title": "Talentless Nana",
+      "year": 2020,
+      "note": "A class of gifted students faces an unseen threat. Start blind for the strongest first episode."
+    },
+    {
+      "title": "Tomodachi Game",
+      "year": 2022,
+      "note": "Friends enter debt games designed to erode trust. Reading motives is as important as solving rules."
+    },
+    {
+      "title": "Classroom of the Elite",
+      "year": 2017,
+      "note": "Students compete under hidden incentives. A reserved strategist turns school politics into calculated moves."
+    },
+    {
+      "title": "Battle Game in 5 Seconds",
+      "year": 2021,
+      "note": "Captives must infer opponents' powers mid-fight. Winning depends on information asymmetry."
+    },
+    {
+      "title": "Ajin: Demi-Human",
+      "year": 2016,
+      "note": "An immortal teenager becomes a target. A resourceful antagonist finds unsettling uses for the rules."
+    },
+    {
+      "title": "Inuyashiki",
+      "year": 2017,
+      "note": "Two people receive the same extraordinary power. Their opposing choices set up an escalating collision."
+    },
+    {
+      "title": "86 Eighty-Six",
+      "year": 2021,
+      "note": "A commander learns who really fights her country's war. Military secrets and squad stakes echo AoT."
+    },
+    {
+      "title": "Mobile Suit Gundam 00",
+      "year": 2007,
+      "note": "An armed group intervenes in international conflicts. An independent Gundam story driven by political consequences."
+    },
+    {
+      "title": "Legend of the Galactic Heroes: Die Neue These",
+      "year": 2018,
+      "note": "Two commanders face off across rival political systems. Fleet tactics and governance share the spotlight."
+    },
+    {
+      "title": "Vinland Saga",
+      "year": 2019,
+      "note": "A young fighter follows the man he wants to defeat. Political schemes dominate early, then the pace turns reflective."
+    },
+    {
+      "title": "Kingdom",
+      "year": 2012,
+      "note": "A servant aims to become a general in ancient China. Battlefield tactics reward patience with early animation."
+    },
+    {
+      "title": "Golden Kamuy",
+      "year": 2018,
+      "note": "Rival factions pursue a coded treasure map. Sudden alliances make the search unpredictable."
+    },
+    {
+      "title": "Baccano!",
+      "year": 2007,
+      "note": "Criminals and passengers collide across intersecting timelines. Reconstructing the order is half the fun."
+    },
+    {
+      "title": "Durarara!!",
+      "year": 2010,
+      "note": "Ikebukuro's strangers are more connected than they seem. A patient ensemble mystery with overlapping schemes."
+    },
+    {
+      "title": "Odd Taxi",
+      "year": 2021,
+      "note": "A taxi driver hears fragments of a missing-person case. Seemingly casual conversations become evidence."
+    },
+    {
+      "title": "Monster",
+      "year": 2004,
+      "note": "A surgeon hunts a former patient. Exceptional criminal psychology with a much slower pace than Death Note."
+    },
+    {
+      "title": "Pluto",
+      "year": 2023,
+      "note": "A detective investigates attacks on advanced robots. Dense casework and moral uncertainty outweigh the action."
+    },
+    {
+      "title": "Ghost in the Shell: Stand Alone Complex",
+      "year": 2002,
+      "note": "A cybercrime unit investigates identity and manipulation. Standalone missions surround a larger case."
+    },
+    {
+      "title": "Vivy: Fluorite Eye’s Song",
+      "year": 2021,
+      "note": "An AI receives a mission that spans decades. Each intervention changes what comes next."
+    },
+    {
+      "title": "Cyberpunk: Edgerunners",
+      "year": 2022,
+      "note": "A young mercenary joins a crew in Night City. Short, decisive and built around the cost of upgrading."
+    },
+    {
+      "title": "Akudama Drive",
+      "year": 2020,
+      "note": "An ordinary woman gets caught in a criminal mission. A heist structure gives the action direction."
+    },
+    {
+      "title": "Darker than Black",
+      "year": 2007,
+      "note": "An operative navigates rival intelligence agencies. Missions hinge on powers with specific costs."
+    },
+    {
+      "title": "Black Lagoon",
+      "year": 2006,
+      "note": "A businessman is pulled into a smuggling crew. Fast tactical action with morally flexible alliances."
+    },
+    {
+      "title": "Jormungand",
+      "year": 2012,
+      "note": "A young guard travels with an arms dealer. Negotiations are often as dangerous as firefights."
+    },
+    {
+      "title": "Great Pretender",
+      "year": 2020,
+      "note": "Con artists stage elaborate international jobs. The hook is figuring out who knows the full plan."
+    },
+    {
+      "title": "91 Days",
+      "year": 2016,
+      "note": "An infiltrator pursues revenge inside a crime family. A short Mafia-style story with a clear target."
+    },
+    {
+      "title": "Banana Fish",
+      "year": 2018,
+      "note": "A gang leader investigates a mysterious phrase. Conspiracy drives the plot, alongside intense personal trauma."
+    },
+    {
+      "title": "Rokka: Braves of the Six Flowers",
+      "year": 2015,
+      "note": "Seven heroes gather for a prophecy naming six. Fantasy becomes a closed-circle impostor mystery."
+    },
+    {
+      "title": "Astra Lost in Space",
+      "year": 2019,
+      "note": "Students stranded far from home coordinate survival. A compact mystery with a destination and payoff."
+    },
+    {
+      "title": "The Millionaire Detective – Balance: Unlimited",
+      "year": 2020,
+      "note": "Two detectives tackle cases with radically different resources. Procedural puzzles build into a larger investigation."
+    },
+    {
+      "title": "Link Click",
+      "year": 2021,
+      "note": "Two partners enter photographs to solve cases. This Chinese animated series fits your time-puzzle taste especially well."
+    },
+    {
+      "title": "World Trigger",
+      "year": 2014,
+      "note": "Teams defend a city through coordinated tactical battles. Expect a long runway before the strongest strategy arcs."
+    },
+    {
+      "title": "Blue Lock",
+      "year": 2022,
+      "note": "Strikers compete inside a harsh selection programme. Psychological rivalries give sports a survival-game edge."
+    },
+    {
+      "title": "Mob Psycho 100",
+      "year": 2016,
+      "note": "A powerful psychic tries to govern his abilities. A strong completed arc, with more comedy than your leading picks."
+    }
+  ]
+}
