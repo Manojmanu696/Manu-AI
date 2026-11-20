@@ -1,5 +1,7 @@
-import { CutBrowse } from "@/components/cut/browse";
+"use client";
+
+import Dashboard from "./dashboard";
 
 export default function Home() {
-  return <CutBrowse view="home"/>;
+  return <Dashboard />;
 }
