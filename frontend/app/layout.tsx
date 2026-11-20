@@ -5,6 +5,7 @@ import "./cinematic.css";
 import "./bridge.css";
 import "./google-home.css";
 import "./manu-modern.css";
+import "../components/cinema-home.css";
 import "./cut.css";
 
 export const metadata: Metadata = { title: "Manu’s Cut", description: "Discover films, series and anime, and keep a personal viewing journal." };

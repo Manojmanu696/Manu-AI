@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Sidebar } from "@/components/sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { cardRating, cutPath, mediaTypes, safeUrl, statuses, type CutTitle } from "@/lib/cut";
@@ -28,39 +29,42 @@ export function Glyph({ name, size = 20 }: { name: keyof typeof glyphs; size?: n
   return <svg aria-hidden="true" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{glyphs[name]}</svg>;
 }
 
-const menu = [
-  ["Home", "/"], ["Discover", "/browse/discover"], ["Movies", "/browse/movies"],
-  ["TV Series", "/browse/tv"], ["Anime", "/browse/anime"],
-] as const;
+const activeSections: Record<string, string> = {
+  "/browse/discover": "discover",
+  "/browse/movies": "movie",
+  "/browse/tv": "tv",
+  "/browse/anime": "anime",
+  "/browse/library": "library",
+  "/browse/reviews": "library",
+};
 
 export function CutFrame({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [query, setQuery] = useState("");
   return (
-    <div className="cut">
-      <a className="cut-skip" href="#cut-main">Skip to content</a>
-      <header className="cut-header">
-        <div className="cut-header-inner">
-          <Link className="cut-brand" href="/" aria-label="Manu’s Cut home">Manu’s Cut<span className="cut-brand-mark" aria-hidden="true"/></Link>
-          <nav className="cut-nav" aria-label="Browse">
-            {menu.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}>{label}</Link>)}
-          </nav>
-          <div className="cut-header-tools">
-            <form className="cut-quick-search" role="search" aria-label="Search titles" onSubmit={event => {
-              event.preventDefault();
-              router.push(query.trim() ? `/browse/discover?q=${encodeURIComponent(query.trim())}` : "/browse/discover");
-            }}>
-              <button type="submit" aria-label="Search titles"><Glyph name="search" size={19}/></button>
-              <input aria-label="Search movies, TV and anime" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search titles" maxLength={200}/>
-            </form>
-            <Link className="cut-mobile-search" href="/browse/discover#title-search" aria-label="Search titles"><Glyph name="search"/></Link>
-            <Link className="cut-library-link" href="/browse/library" aria-label="My Library" aria-current={pathname === "/browse/library" ? "page" : undefined}><Glyph name="bookmark" size={19}/><span>My Library</span></Link>
+    <div className="shell cinema-shell">
+      <Sidebar active={activeSections[pathname] ?? ""}/>
+      <div className="main cut cut-shell-content">
+        <a className="cut-skip" href="#cut-main">Skip to content</a>
+        <header className="cut-header">
+          <div className="cut-header-inner">
+            <Link className="cut-brand" href="/" aria-label="Manu’s Cut home">Manu’s Cut<span className="cut-brand-mark" aria-hidden="true"/></Link>
+            <div className="cut-header-tools">
+              <form className="cut-quick-search" role="search" aria-label="Search titles" onSubmit={event => {
+                event.preventDefault();
+                router.push(query.trim() ? `/browse/discover?q=${encodeURIComponent(query.trim())}` : "/browse/discover");
+              }}>
+                <button type="submit" aria-label="Search titles"><Glyph name="search" size={19}/></button>
+                <input aria-label="Search movies, TV and anime" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search titles" maxLength={200}/>
+              </form>
+              <Link className="cut-mobile-search" href="/browse/discover#title-search" aria-label="Search titles"><Glyph name="search"/></Link>
+            </div>
           </div>
-        </div>
-      </header>
-      <main id="cut-main" tabIndex={-1}>{children}</main>
-      <footer className="cut-footer"><div className="cut-container"><Link className="cut-footer-brand" href="/">Manu’s Cut</Link><nav aria-label="Manu AI tools"><Link href="/manu-ai">Manu AI tools</Link><Link href="/profile">Taste profile</Link><Link href="/memory-bridge">Memory bridge</Link></nav></div></footer>
+        </header>
+        <main id="cut-main" tabIndex={-1}>{children}</main>
+        <footer className="cut-footer"><div className="cut-container"><Link className="cut-footer-brand" href="/">Manu’s Cut</Link><nav aria-label="Manu AI tools"><Link href="/?view=ai">Manu AI tools</Link><Link href="/profile">Taste profile</Link><Link href="/memory-bridge">Memory bridge</Link></nav></div></footer>
+      </div>
     </div>
   );
 }

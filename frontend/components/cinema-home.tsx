@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, MediaItem, Recommendation } from "@/lib/api";
 import SearchExperience from "./search-experience";
-import "./cinema-home.css";
+import Link from "next/link";
 
 type Title = Pick<MediaItem, "id" | "title" | "media_type" | "description" | "genres" | "tags" | "runtime" | "release_year" | "image_url"> & {
   imdb_rating?: number | null;
@@ -150,7 +150,7 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
               <p className="cinema-synopsis">{hero?.item.description || (hero ? hero.reasons?.[0] : "Discover films, series, anime, games and books.")}</p>
               <div className="cinema-actions">
                 {hero && <button className="cinema-button cinema-primary" onClick={() => setDetail(hero)}>View title <span aria-hidden="true">↗</span></button>}
-                <a className="cinema-button" href="/discovery">Explore catalogue</a>
+                <Link className="cinema-button" href="/browse/discover">Explore catalogue</Link>
               </div>
             </div>
             {slides.length > 1 && <div className="cinema-carousel" aria-label="Choose a featured title">

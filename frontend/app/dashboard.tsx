@@ -1,24 +1,26 @@
 "use client";
 import { useEffect, useState } from "react";
+import { CutBrowse } from "@/components/cut/browse";
 import CinemaHome from "@/components/cinema-home";
 import { Sidebar } from "@/components/sidebar";
 import { MediaCard } from "@/components/media-card";
 import { api, MediaItem, Memory, Recommendation } from "@/lib/api";
 
-const labels: Record<string,string> = { home:"Home", discover:"Discover", movie:"Movies", anime:"Anime", tv:"TV Shows", game:"Games", book:"Books", memory:"Memory", data:"Data", ai:"AI", settings:"Settings" };
-const mediaTypes: Record<string,string> = { movie:"movie", anime:"anime", tv:"tv", game:"game", book:"book" };
+const labels: Record<string, string> = {
+  game: "Games", book: "Books", memory: "Memory", data: "Data", ai: "AI", settings: "Settings",
+};
 type Summary={database_bytes:number;counts:Record<string,number>;memories:number;last_backup:string|null;backup_location:string};
 
-export default function Dashboard(){
- const [page,setPage]=useState("home"),[items,setItems]=useState<MediaItem[]>([]),[recs,setRecs]=useState<Recommendation[]>([]),[memories,setMemories]=useState<Memory[]>([]),[summary,setSummary]=useState<Summary|null>(null),[loading,setLoading]=useState(true);
+export default function Dashboard({ view }: { view?: string }) {
+ const page = view && Object.prototype.hasOwnProperty.call(labels, view) ? view : "home";
+ const [items,setItems]=useState<MediaItem[]>([]),[recs,setRecs]=useState<Recommendation[]>([]),[memories,setMemories]=useState<Memory[]>([]),[summary,setSummary]=useState<Summary|null>(null),[loading,setLoading]=useState(true);
  const refresh=async()=>{try{const [m,r,mm,s]=await Promise.all([api<MediaItem[]>("/media"),api<Recommendation[]>("/recommendations?limit=24"),api<Memory[]>("/memories"),api<Summary>("/data/summary")]);setItems(m);setRecs(r);setMemories(mm);setSummary(s)}catch{}finally{setLoading(false)}};
  useEffect(()=>{void refresh()},[]);
  if(loading)return <div className="boot"><span className="brand-mark">M</span><p>Opening Manu AI…</p></div>;
  const label=labels[page]||"Home";
- return <div className="shell cinema-shell"><Sidebar active={page} onNavigate={setPage}/><main className="main">{page==="home"?<CinemaHome items={items} recommendations={recs} onRefresh={refresh}/>:<><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{page==="discover"&&<Discover recs={recs}/>} {mediaTypes[page]&&<Library label={label} items={items.filter(x=>x.media_type===mediaTypes[page])}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</>}</main></div>;
+ return <div className="shell cinema-shell"><Sidebar active={page}/><main className="main">{page==="home"?<><CinemaHome items={items} recommendations={recs} onRefresh={refresh}/><CutBrowse view="home" embedded/></>:<><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{(page==="game"||page==="book")&&<Library key={page} label={label} items={items.filter(x=>x.media_type===page)}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</>}</main></div>;
 }
 
-function Discover({recs}:{recs:Recommendation[]}){return <div className="content"><section className="page-intro"><p className="eyebrow">DISCOVER</p><h1>Find your next obsession.</h1><p>Personalized recommendations from your saved taste and catalogue.</p></section>{recs.length?<div className="recommendation-grid">{recs.map(r=><MediaCard key={r.item.id} recommendation={r}/>)}</div>:<div className="library-empty"><h2>No recommendations yet.</h2><p>Use Home search to discover current movies, anime, shows, games and books.</p></div>}</div>}
 
 function Library({label,items}:{label:string;items:MediaItem[]}){const[q,setQ]=useState("");const show=items.filter(i=>i.title.toLowerCase().includes(q.toLowerCase()));return <div className="content"><section className="library-head"><div><p className="eyebrow">YOUR LIBRARY</p><h1>{label}</h1><p>{items.length} {items.length===1?"item":"items"} saved locally.</p></div></section><div className="library-tools"><div className="search-field"><span>⌕</span><input value={q} onChange={e=>setQ(e.target.value)} placeholder={`Search ${label.toLowerCase()}…`}/></div></div>{show.length?<div className="library-grid">{show.map(i=><MediaCard key={i.id} item={i}/>)}</div>:<div className="library-empty"><h2>No saved {label.toLowerCase()}.</h2><p>Your local library can be empty. Home still searches the internet and can personalize discovery.</p></div>}</div>}
 

@@ -4,51 +4,11 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import { cardRating, cutPath, mediaTypes, messageFrom, sameTitle, splitLabels, statuses, titleApi, titleTime, type BrowseData, type CutTitle, type ScreenType } from "@/lib/cut";
-import { Artwork, CutFrame, Glyph, Poster, Shelf, StatePanel } from "./ui";
+import { cardRating, cutPath, mediaTypes, messageFrom, sameTitle, splitLabels, statuses, titleApi, type BrowseData, type CutTitle, type ScreenType } from "@/lib/cut";
+import { CutFrame, Glyph, Poster, Shelf, StatePanel } from "./ui";
 
 const viewTypes: Record<string, ScreenType> = { movies: "movie", tv: "tv", anime: "anime" };
 const viewNames: Record<string, string> = { discover: "Discover", movies: "Movies", tv: "TV Series", anime: "Anime", library: "My Library", reviews: "Recently Reviewed" };
-
-function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string; save: (title: CutTitle) => void }) {
-  const [index, setIndex] = useState(0);
-  const [pinned, setPinned] = useState<CutTitle[]>();
-  const picks = pinned?.map(pick => titles.find(title => sameTitle(title, pick)) ?? pick) ?? titles.slice(0, 3);
-  const title = picks[index] ?? picks[0];
-  if (!title) return <div className="cut-container cut-empty-home"><StatePanel title="Welcome to Manu’s Cut"><p>Add a title to start your viewing journal.</p><Link className="cut-btn cut-primary" href="/browse/library">Open My Library <Glyph name="arrow"/></Link></StatePanel></div>;
-
-  const saved = !!title.media_id && title.status !== "recommended";
-  const pending = saving === cutPath(title);
-  const rating = cardRating(title);
-  const genre = splitLabels(title.genres)[0];
-  const metadata = [title.release_year, titleTime(title), genre || mediaTypes[title.media_type]].filter(Boolean);
-
-  return <section className="cut-container cut-hero" aria-label="Featured titles">
-    <div className="cut-hero-visual">
-      <Artwork title={title} backdrop eager sizes="(max-width: 1600px) 100vw, 1600px"/>
-    </div>
-    <div className="cut-hero-copy" aria-live="polite">
-      <h1>{title.title}</h1>
-      <div className="cut-hero-facts">{rating && <span className="cut-feature-score"><Glyph name="star" size={15}/> {rating.value.toFixed(1)} <small>{rating.source}</small></span>}<span>{metadata.join(" · ")}</span></div>
-      {title.description && <p className="cut-feature-summary">{title.description}</p>}
-      <div className="cut-actions cut-feature-actions">
-        <Link href={cutPath(title)} className="cut-btn cut-feature-open">{title.media_type === "movie" ? "View film" : "View title"} <Glyph name="arrow" size={17}/></Link>
-        {saved
-          ? <Link className="cut-feature-save" href={cutPath(title)}><Glyph name="check" size={18}/> In My Library</Link>
-          : <button className="cut-feature-save" type="button" disabled={pending} onClick={() => {
-              setPinned(picks);
-              save(title);
-            }}><Glyph name="bookmark" size={18}/> {pending ? "Saving…" : "Save to watchlist"}</button>}
-      </div>
-    </div>
-    {picks.length > 1 && <div className="cut-feature-select" role="group" aria-label="Choose a featured title">
-      {picks.map((pick, position) => <button key={position} type="button" onClick={() => setIndex(position)} aria-pressed={pick === title}>
-        <span className="cut-pick-art"><Artwork title={pick}/></span>
-        <span className="cut-pick-info"><strong>{pick.title}</strong><small>{[pick.release_year, titleTime(pick)].filter(Boolean).join(" · ")}</small></span>
-      </button>)}
-    </div>}
-  </section>;
-}
 
 function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: string; save: (title: CutTitle) => void; load: () => Promise<void> }) {
   const [demoBusy, setDemoBusy] = useState(false);
@@ -58,10 +18,6 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
   const recommendations = [...data.catalogue, ...data.library.filter(title => title.status === "recommended")];
   const combined = [...recommendations, ...data.library.filter(title => title.status !== "recommended")];
   const genreLinks = [...new Set(combined.flatMap(title => splitLabels(title.genres)))].slice(0, 7);
-  const filmFeatures = combined.filter(title => title.media_type === "movie" && title.backdrop_url);
-  const favorite = filmFeatures.filter(title => title.personal_rating != null)
-    .sort((a, b) => (b.personal_rating ?? 0) - (a.personal_rating ?? 0) || (b.release_year ?? 0) - (a.release_year ?? 0))[0];
-  const featured = favorite ? [favorite, ...filmFeatures.filter(title => title !== favorite)] : filmFeatures.length ? filmFeatures : combined;
 
   async function loadDemo() {
     setDemoBusy(true);
@@ -77,7 +33,6 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
   }
 
   return <>
-    <Featured titles={featured} saving={saving} save={save}/>
     <div className="cut-container cut-home-shelves">
       {genreLinks.length > 0 && <nav className="cut-genre-links" aria-label="Browse by genre">
         {genreLinks.map(genre => <Link key={genre} href={`/browse/discover?genre=${encodeURIComponent(genre)}`}>{genre}</Link>)}
@@ -210,7 +165,7 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
   </div>;
 }
 
-export function CutBrowse({ view }: { view: string }) {
+export function CutBrowse({ view, embedded = false }: { view: string; embedded?: boolean }) {
   const [data, setData] = useState<BrowseData>();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState<{ text: string; error?: boolean }>();
@@ -252,11 +207,13 @@ export function CutBrowse({ view }: { view: string }) {
     }
   }
 
-  return <CutFrame>
+  const content = <>
     {notice && <div className={`cut-toast ${notice.error ? "is-error" : ""}`} role={notice.error ? "alert" : "status"}>{notice.text}<button aria-label="Dismiss message" onClick={() => setNotice(undefined)}><Glyph name="close" size={17}/></button></div>}
     {error ? <div className="cut-container cut-body-spacing"><StatePanel error title="Couldn’t open your catalogue"><p>{error}</p><button className="cut-btn cut-secondary" onClick={() => void load()}>Retry</button></StatePanel></div>
       : !data ? <div className="cut-container cut-body-spacing" role="status" aria-busy="true"><div className="cut-loading"/><p>Opening your catalogue…</p></div>
       : view === "home" ? <HomeContent data={data} save={save} saving={saving} load={load}/>
       : <Results key={view} data={data} view={view} saving={saving} save={save}/>}
-  </CutFrame>;
+  </>;
+
+  return embedded ? <section className="cut cut-embedded" aria-label="Catalogue and viewing journal">{content}</section> : <CutFrame>{content}</CutFrame>;
 }

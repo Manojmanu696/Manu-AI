@@ -1,5 +1,10 @@
-import { CutBrowse } from "@/components/cut/browse";
+import Dashboard from "./dashboard";
 
-export default function Home() {
-  return <CutBrowse view="home"/>;
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ view?: string | string[] }>;
+}) {
+  const { view } = await searchParams;
+  return <Dashboard view={typeof view === "string" ? view : undefined} />;
 }

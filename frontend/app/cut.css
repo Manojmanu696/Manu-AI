@@ -322,3 +322,12 @@
 @media (prefers-reduced-motion: reduce) {
   .cut *, .cut *::before, .cut *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
 }
+
+/* Catalogue pages share the homepage sidebar. */
+.cut-shell-content .cut-header-inner {
+  min-height: 68px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto;
+}
+.cut-shell-content .cut-header-tools { grid-column: 2; }
+.cut-embedded.cut { min-height: 0; background: transparent; }
