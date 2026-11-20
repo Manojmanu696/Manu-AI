@@ -24,7 +24,7 @@ function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string
 
   return <section className="cut-container cut-hero" aria-label="Featured titles">
     <div className="cut-hero-visual">
-      <Artwork title={title} backdrop eager sizes="(max-width: 720px) 94vw, (max-width: 1600px) 59vw, 940px"/>
+      <Artwork title={title} backdrop eager sizes="(max-width: 1600px) 100vw, 1600px"/>
     </div>
     <div className="cut-hero-copy" aria-live="polite">
       <h1>{title.title}</h1>
