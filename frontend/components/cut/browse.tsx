@@ -12,29 +12,39 @@ const viewNames: Record<string, string> = { discover: "Discover", movies: "Movie
 
 function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string; save: (title: CutTitle) => void }) {
   const [index, setIndex] = useState(0);
-  const title = titles[index % (titles.length || 1)];
+  const [pinned, setPinned] = useState<CutTitle[]>();
+  const picks = pinned?.map(pick => titles.find(title => sameTitle(title, pick)) ?? pick) ?? titles.slice(0, 3);
+  const title = picks[index] ?? picks[0];
   if (!title) return <div className="cut-container cut-empty-home"><StatePanel title="Welcome to Manu’s Cut"><p>Add a title to start your viewing journal.</p><Link className="cut-btn cut-primary" href="/browse/library">Open My Library <Glyph name="arrow"/></Link></StatePanel></div>;
+
   const saved = !!title.media_id && title.status !== "recommended";
-  return <section className="cut-hero" aria-label="Featured titles">
-    <Artwork title={title} backdrop eager/>
-    <div className="cut-container cut-hero-inner">
-      <div className="cut-hero-copy" aria-live="polite">
-        <div className="cut-kicker"><span/>Featured title</div>
-        <h1>{title.title}</h1>
-        <div className="cut-hero-meta">
-          {[mediaTypes[title.media_type], title.release_year, titleTime(title), ...splitLabels(title.genres).slice(0, 2)].filter(Boolean).map(value => <span key={value}>{value}</span>)}
-        </div>
-        {title.description && <p className="cut-hero-description">{title.description}</p>}
-        <div className="cut-actions">
-          <Link href={cutPath(title)} className="cut-btn cut-primary"><Glyph name="arrow"/> Explore title</Link>
-          {saved ? <Link className="cut-btn cut-secondary" href={cutPath(title)}><Glyph name="check"/> In My Library</Link>
-            : <button className="cut-btn cut-secondary" onClick={() => save(title)} disabled={saving === cutPath(title)}><Glyph name="plus"/> {saving === cutPath(title) ? "Saving…" : "Watchlist"}</button>}
-        </div>
-      </div>
-      {titles.length > 1 && <div className="cut-feature-select" aria-label="Choose a featured title">
-        {titles.map((slide, position) => <button key={cutPath(slide)} onClick={() => setIndex(position)} aria-label={`Feature ${slide.title}`} aria-pressed={slide === title}><span/></button>)}
-      </div>}
+  const pending = saving === cutPath(title);
+  const genre = splitLabels(title.genres)[0];
+  const metadata = [title.release_year, titleTime(title), genre || mediaTypes[title.media_type]].filter(Boolean);
+
+  return <section className="cut-container cut-hero" aria-label="Featured titles">
+    <div className="cut-hero-visual">
+      <Artwork title={title} backdrop eager sizes="(max-width: 720px) 94vw, (max-width: 1600px) 59vw, 940px"/>
     </div>
+    <div className="cut-hero-copy" aria-live="polite">
+      <h1>{title.title}</h1>
+      <p className="cut-hero-facts">{metadata.join(" · ")}</p>
+      {title.description && <p className="cut-feature-summary">{title.description}</p>}
+      <div className="cut-actions cut-feature-actions">
+        <Link href={cutPath(title)} className="cut-btn cut-feature-open">{title.media_type === "movie" ? "View film" : "View title"} <Glyph name="arrow" size={17}/></Link>
+        {saved
+          ? <Link className="cut-feature-save" href={cutPath(title)}><Glyph name="check" size={18}/> In My Library</Link>
+          : <button className="cut-feature-save" type="button" disabled={pending} onClick={() => {
+              setPinned(picks);
+              save(title);
+            }}><Glyph name="bookmark" size={18}/> {pending ? "Saving…" : "Save to watchlist"}</button>}
+      </div>
+    </div>
+    {picks.length > 1 && <div className="cut-feature-select" role="group" aria-label="Choose a featured title">
+      {picks.map((pick, position) => <button key={position} type="button" onClick={() => setIndex(position)} aria-pressed={pick === title}>
+        <span>{pick.title}</span>
+      </button>)}
+    </div>}
   </section>;
 }
 
@@ -46,7 +56,7 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
   const recommendations = [...data.catalogue, ...data.library.filter(title => title.status === "recommended")];
   const combined = [...recommendations, ...data.library.filter(title => title.status !== "recommended")];
   const filmFeatures = combined.filter(title => title.media_type === "movie" && title.backdrop_url);
-  const featured = (filmFeatures.length ? filmFeatures : combined).slice(0, 3);
+  const featured = filmFeatures.length ? filmFeatures : combined;
 
   async function loadDemo() {
     setDemoBusy(true);

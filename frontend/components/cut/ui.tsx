@@ -42,7 +42,7 @@ export function CutFrame({ children }: { children: ReactNode }) {
       <a className="cut-skip" href="#cut-main">Skip to content</a>
       <header className="cut-header">
         <div className="cut-header-inner">
-          <Link className="cut-brand" href="/" aria-label="Manu’s Cut home"><span className="cut-brand-icon"><Glyph name="film" size={19}/></span><span>Manu’s <em>Cut</em></span></Link>
+          <Link className="cut-brand" href="/" aria-label="Manu’s Cut home">Manu’s Cut<span className="cut-brand-mark" aria-hidden="true"/></Link>
           <nav className="cut-nav" aria-label="Browse">
             {menu.map(([label, href]) => <Link key={href} href={href} aria-current={pathname === href ? "page" : undefined}>{label}</Link>)}
           </nav>
@@ -55,7 +55,7 @@ export function CutFrame({ children }: { children: ReactNode }) {
               <input aria-label="Search movies, TV and anime" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search titles" maxLength={200}/>
             </form>
             <Link className="cut-mobile-search" href="/browse/discover#title-search" aria-label="Search titles"><Glyph name="search"/></Link>
-            <Link className="cut-library-link" href="/browse/library" aria-current={pathname === "/browse/library" ? "page" : undefined}><Glyph name="bookmark" size={19}/><span>My Library</span></Link>
+            <Link className="cut-library-link" href="/browse/library" aria-label="My Library" aria-current={pathname === "/browse/library" ? "page" : undefined}><Glyph name="bookmark" size={19}/><span>My Library</span></Link>
           </div>
         </div>
       </header>
@@ -69,7 +69,7 @@ function tmdbSizes(url: string, sizes: string[]) {
   return sizes.map(size => url.replace(/\/t\/p\/w\d+\//, `/t/p/w${size}/`) + ` ${size}w`).join(", ");
 }
 
-export function Artwork({ title, backdrop = false, eager = false }: { title: CutTitle; backdrop?: boolean; eager?: boolean }) {
+export function Artwork({ title, backdrop = false, eager = false, sizes }: { title: CutTitle; backdrop?: boolean; eager?: boolean; sizes?: string }) {
   const url = safeUrl(backdrop ? title.backdrop_url || title.image_url : title.image_url);
   const [failed, setFailed] = useState<string>();
   const wide = backdrop && !!title.backdrop_url;
@@ -80,7 +80,7 @@ export function Artwork({ title, backdrop = false, eager = false }: { title: Cut
         // TMDB supplies width-specific art directly. Stored imagery can come from arbitrary hosts.
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={url} srcSet={tmdb ? tmdbSizes(url, wide ? ["780", "1280"] : ["185", "342", "500"]) : undefined}
-            sizes={tmdb ? (wide ? "100vw" : "(max-width: 540px) 45vw, (max-width: 950px) 24vw, 220px") : undefined}
+            sizes={tmdb ? (wide ? sizes || "100vw" : "(max-width: 540px) 45vw, (max-width: 950px) 24vw, 220px") : undefined}
             alt="" loading={eager ? "eager" : "lazy"} fetchPriority={eager ? "high" : "auto"} decoding="async" onError={() => setFailed(url)}/>
         : <span className="cut-art-fallback" aria-label={backdrop ? undefined : "No poster available"}><Glyph name="film" size={35}/>{!backdrop && <span>{mediaTypes[title.media_type]}</span>}</span>}
     </span>
