@@ -14,23 +14,29 @@ type Title = Pick<MediaItem, "id" | "title" | "media_type" | "description" | "ge
 type PickEntry = { item: Title; score?: number; reasons?: string[]; source?: string };
 const types: Record<string, string> = { movie: "Film", tv: "Series", anime: "Anime", game: "Game", book: "Book" };
 
-function Artwork({ item }: { item?: Title }) {
-  const [failed, setFailed] = useState(false);
+function Artwork({ item, featured = false }: { item?: Title; featured?: boolean }) {
+  const [failedUrl, setFailedUrl] = useState<string>();
+  const imageUrl = item?.image_url;
+  const hasImage = !!imageUrl && imageUrl !== failedUrl;
   return (
-    <span className="cinema-art" data-type={item?.media_type}>
-      {item?.image_url && !failed && <img src={item.image_url} alt="" onError={() => setFailed(true)} />}
+    <span className={`cinema-art${featured ? " cinema-art-featured" : ""}`} data-type={item?.media_type}>
+      {hasImage ? <img src={imageUrl} alt="" loading={featured ? "eager" : "lazy"} onError={() => setFailedUrl(imageUrl)} />
+        : !featured && item && <span className="cinema-art-initial" aria-hidden="true">{item.title.trim().charAt(0).toUpperCase()}</span>}
     </span>
   );
 }
 
-function Section({ title, entries, onOpen, compact = false }: {
-  title: string; entries: PickEntry[]; onOpen: (entry: PickEntry) => void; compact?: boolean;
+function Section({ title, entries, onOpen, href }: {
+  title: string; entries: PickEntry[]; onOpen: (entry: PickEntry) => void; href?: string;
 }) {
   if (!entries.length) return null;
   return (
     <section className="cinema-shelf" aria-label={title}>
-      <h2>{title}</h2>
-      <div className={compact ? "cinema-grid cinema-grid-compact" : "cinema-grid"}>
+      <header className="cinema-shelf-heading">
+        <h2>{title}</h2>
+        {href && <Link href={href} aria-label={`View all: ${title}`}>View all <span aria-hidden="true">→</span></Link>}
+      </header>
+      <div className="cinema-grid">
         {entries.map(entry => (
           <button key={entry.item.id} className="cinema-tile" onClick={() => onOpen(entry)}>
             <Artwork item={entry.item} />
@@ -137,7 +143,7 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
       <SearchExperience browse={
         <>
           <section className="cinema-hero" aria-label="Featured picks">
-            <Artwork key={hero?.item.id ?? "welcome"} item={hero?.item} />
+            <Artwork key={hero?.item.id ?? "welcome"} item={hero?.item} featured />
             <div className="cinema-hero-copy">
               <p className="cinema-kicker">{hero ? "Tonight’s pick" : "Manu AI · Browse"}</p>
               <h1>{hero?.item.title ?? "Find your next favourite."}</h1>
@@ -166,12 +172,11 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
           </section>
           {status === "loading" && <p className="cinema-status" role="status">Loading recommendations…</p>}
           {status === "error" && <p className="cinema-status" role="status">The discovery catalogue is currently unavailable.</p>}
-          <Section title="Recommended for you" entries={feed.slice(0, 4)} onOpen={setDetail} compact />
-          <Section title="Continue watching, reading or playing" entries={continueEntries} onOpen={setDetail} />
-          <Section title="Your watchlist" entries={savedEntries} onOpen={setDetail} />
-          {Object.entries(types).map(([type, label]) => (
-            <Section key={type} title={type === "anime" ? "Anime" : `${label}s`} entries={feed.filter(entry => entry.item.media_type === type).slice(0, 8)} onOpen={setDetail} />
-          ))}
+          <Section title="Continue where you left off" entries={continueEntries} onOpen={setDetail} href="/browse/library?status=current" />
+          <Section title="Your watchlist" entries={savedEntries} onOpen={setDetail} href="/browse/library?status=watchlist" />
+          <Section title="Recommended for you" entries={feed.slice(0, 8)} onOpen={setDetail} href="/browse/discover?status=recommended" />
+          <Section title="Games" entries={feed.filter(entry => entry.item.media_type === "game").slice(0, 8)} onOpen={setDetail} href="/?view=game" />
+          <Section title="Books" entries={feed.filter(entry => entry.item.media_type === "book").slice(0, 8)} onOpen={setDetail} href="/?view=book" />
         </>
       } />
       {detail && <TitleDetails entry={detail} saved={items.find(item =>

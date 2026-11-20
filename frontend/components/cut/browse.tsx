@@ -13,8 +13,6 @@ const viewNames: Record<string, string> = { discover: "Discover", movies: "Movie
 function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: string; save: (title: CutTitle) => void; load: () => Promise<void> }) {
   const [demoBusy, setDemoBusy] = useState(false);
   const [demoError, setDemoError] = useState("");
-  const watching = data.library.filter(title => title.status === "current");
-  const watchlist = data.library.filter(title => title.status === "want" || title.status === "on_hold");
   const recommendations = [...data.catalogue, ...data.library.filter(title => title.status === "recommended")];
   const combined = [...recommendations, ...data.library.filter(title => title.status !== "recommended")];
   const genreLinks = [...new Set(combined.flatMap(title => splitLabels(title.genres)))].slice(0, 7);
@@ -37,9 +35,6 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
       {genreLinks.length > 0 && <nav className="cut-genre-links" aria-label="Browse by genre">
         {genreLinks.map(genre => <Link key={genre} href={`/browse/discover?genre=${encodeURIComponent(genre)}`}>{genre}</Link>)}
       </nav>}
-      <Shelf name="Recommended for You" href="/browse/discover?status=recommended" titles={recommendations.slice(0, 12)} saving={saving} onSave={save}/>
-      <Shelf name="Continue Watching" href="/browse/library?status=current" titles={watching} saving={saving} onSave={save}/>
-      <Shelf name="Your Watchlist" href="/browse/library?status=watchlist" titles={watchlist} saving={saving} onSave={save}/>
       <Shelf name="Recently Reviewed" href="/browse/reviews" titles={data.reviewed} saving={saving} onSave={save}/>
       <Shelf name="Movies" href="/browse/movies" titles={combined.filter(title => title.media_type === "movie").slice(0, 12)} saving={saving} onSave={save}/>
       <Shelf name="TV Series" href="/browse/tv" titles={combined.filter(title => title.media_type === "tv").slice(0, 12)} saving={saving} onSave={save}/>
