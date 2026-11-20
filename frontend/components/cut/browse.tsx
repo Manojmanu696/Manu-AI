@@ -19,6 +19,7 @@ function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string
 
   const saved = !!title.media_id && title.status !== "recommended";
   const pending = saving === cutPath(title);
+  const rating = cardRating(title);
   const genre = splitLabels(title.genres)[0];
   const metadata = [title.release_year, titleTime(title), genre || mediaTypes[title.media_type]].filter(Boolean);
 
@@ -28,7 +29,7 @@ function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string
     </div>
     <div className="cut-hero-copy" aria-live="polite">
       <h1>{title.title}</h1>
-      <p className="cut-hero-facts">{metadata.join(" · ")}</p>
+      <div className="cut-hero-facts">{rating && <span className="cut-feature-score"><Glyph name="star" size={15}/> {rating.value.toFixed(1)} <small>{rating.source}</small></span>}<span>{metadata.join(" · ")}</span></div>
       {title.description && <p className="cut-feature-summary">{title.description}</p>}
       <div className="cut-actions cut-feature-actions">
         <Link href={cutPath(title)} className="cut-btn cut-feature-open">{title.media_type === "movie" ? "View film" : "View title"} <Glyph name="arrow" size={17}/></Link>
@@ -42,7 +43,8 @@ function Featured({ titles, saving, save }: { titles: CutTitle[]; saving: string
     </div>
     {picks.length > 1 && <div className="cut-feature-select" role="group" aria-label="Choose a featured title">
       {picks.map((pick, position) => <button key={position} type="button" onClick={() => setIndex(position)} aria-pressed={pick === title}>
-        <span>{pick.title}</span>
+        <span className="cut-pick-art"><Artwork title={pick}/></span>
+        <span className="cut-pick-info"><strong>{pick.title}</strong><small>{[pick.release_year, titleTime(pick)].filter(Boolean).join(" · ")}</small></span>
       </button>)}
     </div>}
   </section>;
@@ -55,8 +57,11 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
   const watchlist = data.library.filter(title => title.status === "want" || title.status === "on_hold");
   const recommendations = [...data.catalogue, ...data.library.filter(title => title.status === "recommended")];
   const combined = [...recommendations, ...data.library.filter(title => title.status !== "recommended")];
+  const genreLinks = [...new Set(combined.flatMap(title => splitLabels(title.genres)))].slice(0, 7);
   const filmFeatures = combined.filter(title => title.media_type === "movie" && title.backdrop_url);
-  const featured = filmFeatures.length ? filmFeatures : combined;
+  const favorite = filmFeatures.filter(title => title.personal_rating != null)
+    .sort((a, b) => (b.personal_rating ?? 0) - (a.personal_rating ?? 0) || (b.release_year ?? 0) - (a.release_year ?? 0))[0];
+  const featured = favorite ? [favorite, ...filmFeatures.filter(title => title !== favorite)] : filmFeatures.length ? filmFeatures : combined;
 
   async function loadDemo() {
     setDemoBusy(true);
@@ -74,6 +79,9 @@ function HomeContent({ data, saving, save, load }: { data: BrowseData; saving: s
   return <>
     <Featured titles={featured} saving={saving} save={save}/>
     <div className="cut-container cut-home-shelves">
+      {genreLinks.length > 0 && <nav className="cut-genre-links" aria-label="Browse by genre">
+        {genreLinks.map(genre => <Link key={genre} href={`/browse/discover?genre=${encodeURIComponent(genre)}`}>{genre}</Link>)}
+      </nav>}
       <Shelf name="Recommended for You" href="/browse/discover?status=recommended" titles={recommendations.slice(0, 12)} saving={saving} onSave={save}/>
       <Shelf name="Continue Watching" href="/browse/library?status=current" titles={watching} saving={saving} onSave={save}/>
       <Shelf name="Your Watchlist" href="/browse/library?status=watchlist" titles={watchlist} saving={saving} onSave={save}/>
@@ -129,7 +137,9 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
   const selectedStatus = params.get("status") || "";
   const [query, setQuery] = useState(initialQuery);
   const [type, setType] = useState("");
-  const [genre, setGenre] = useState("");
+  const initialGenre = params.get("genre") || "";
+  const [genre, setGenre] = useState(initialGenre);
+  useEffect(() => { setGenre(initialGenre); }, [initialGenre]);
   const [year, setYear] = useState("");
   const [rating, setRating] = useState("");
   const [status, setStatus] = useState(selectedStatus);
@@ -188,7 +198,7 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
       <label>Status<select aria-label="Status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Any status</option><option value="watchlist">Watchlist</option>{Object.entries(statuses).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
     </form>
     <div className="cut-results-head"><p role="status">{results.length} {results.length === 1 ? "title" : "titles"}{pendingPublic && " · Searching TMDB…"}</p>
-      {canReset && <button className="cut-text-button" onClick={() => { setQuery(""); setGenre(""); setYear(""); setType(""); setRating(""); setStatus(""); if (initialQuery || selectedStatus) router.replace(`/browse/${view}`, { scroll: false }); }}>Clear filters</button>}
+      {canReset && <button className="cut-text-button" onClick={() => { setQuery(""); setGenre(""); setYear(""); setType(""); setRating(""); setStatus(""); if (initialQuery || initialGenre || selectedStatus) router.replace(`/browse/${view}`, { scroll: false }); }}>Clear filters</button>}
     </div>
     {publicError && <div className="cut-inline-notice" role="alert">{publicError} <button className="cut-text-button" onClick={() => { setPublicState(undefined); setAttempt(value => value + 1); }}>Retry</button></div>}
     {results.length ? <div className="cut-grid">{results.map(title => <Poster key={cutPath(title)} title={title} pending={saving === cutPath(title)} onSave={save}/>)}</div>
