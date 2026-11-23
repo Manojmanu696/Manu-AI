@@ -123,15 +123,6 @@ export default function HomeV2() {
     <main className={styles.app}>
       <Sidebar
         active={view === "home" || view === "results" ? "home" : "movie"}
-        onNavigate={(id) => {
-          if (id === "home") setView("home");
-          else if (id === "ai") startAI();
-          else if (["movie", "anime", "tv", "game", "book"].includes(id)) {
-            const mapped = id === "movie" ? "movies" : id === "game" ? "games" : id === "tv" ? "tv" : id === "book" ? "books" : "anime";
-            setCategory(mapped as Category);
-            setView("library");
-          } else setView("home");
-        }}
       />
 
       <section className={styles.main}>

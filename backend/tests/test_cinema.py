@@ -1,5 +1,56 @@
 from app.models import CatalogueItem
 from app.database import SessionLocal
+from app import cinema
+from app.services import ollama
+import json
+
+
+def test_title_prediction_uses_ollama_without_target_rating(client, monkeypatch):
+    arrival = client.post("/media", json={"title": "Arrival", "media_type": "movie", "personal_rating": 9}).json()
+    client.post("/media", json={"title": "Contact", "media_type": "movie", "personal_rating": 8})
+    client.post("/memories", json={"category": "favorite themes", "content": "I enjoy first-contact stories."})
+
+    def chat(messages, *, schema):
+        context = json.loads(messages[-1]["content"])
+        assert context["title"]["title"] == "Arrival"
+        assert "personal_rating" not in context["title"]
+        assert [row["title"] for row in context["other_titles"]] == ["Contact"]
+        assert context["preferences"][0]["content"] == "I enjoy first-contact stories."
+        assert schema["properties"]["score"]["maximum"] == 10
+        return {"_model": "test-model", "message": {"content": json.dumps({
+            "score": 8.6, "explanation": "The first-contact premise suits your stated taste.",
+            "caveat": "There is limited evidence about pacing.",
+        })}}
+
+    monkeypatch.setattr(ollama, "chat", chat)
+    route = f"/cinema/titles/media/{arrival['id']}"
+    prediction = client.post(f"{route}/prediction").json()
+    assert prediction["score"] == 8.6 and prediction["provider"] == "ollama"
+    assert client.get(route).json()["title"]["personal_rating"] == 9
+    monkeypatch.setattr(ollama, "chat", lambda *args, **kwargs: {"message": {"content": '{"score": 12}'}})
+    assert client.post(f"{route}/prediction").status_code == 502
+
+    def offline(*args, **kwargs):
+        raise ollama.OllamaUnavailable("offline")
+
+    monkeypatch.setattr(ollama, "chat", offline)
+    failed = client.post(f"{route}/prediction")
+    assert failed.status_code == 503 and "score" not in failed.json()
+
+
+def test_unfiltered_title_search_returns_openable_series_without_tmdb(client, monkeypatch):
+    from app.services import tvmaze
+
+    monkeypatch.setattr(cinema, "TMDB_API_KEY", None)
+    show = {"id": 82, "name": "Game of Thrones", "premiered": "2011-04-17", "type": "Scripted"}
+    monkeypatch.setattr(tvmaze, "request", lambda path, *args:
+                        [{"show": show}] if path == "search/shows" else show)
+    result = client.get("/cinema/search", params={"query": "game of thrones"}).json()
+    assert [(item["title"], item["media_type"]) for item in result] == [("Game of Thrones", "tv")]
+    title = result[0]
+    route = f"/cinema/titles/{title['source']}/{title['id']}"
+    assert client.get(route).json()["title"]["title"] == "Game of Thrones"
+    assert client.put(f"{route}/status", json={"status": "want"}).status_code == 200
 
 
 def test_catalogue_and_media_titles_share_status_and_journal(client):

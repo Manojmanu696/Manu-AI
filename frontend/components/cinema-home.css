@@ -230,3 +230,12 @@
   .cinema-step { width: 31px; height: 31px; }
   .cinema-grid { grid-auto-columns: clamp(172px, 70%, 240px); }
 }
+.cinema-title-results { margin: 16px 0 48px; overflow-wrap: anywhere; }
+.cinema-title-results h2 { font-size: clamp(21px, 3vw, 31px); }
+.cinema-title-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr)); gap: 16px; max-width: 1050px; }
+.cinema-title-card { display: flex; flex-direction: column; max-width: 210px; overflow: hidden; border-radius: 12px; border: 1px solid #ffffff24; background: #1c1b1b; color: #f7f1ef; text-decoration: none; }
+.cinema-title-card:hover { border-color: #ed7168; }
+.cinema-title-card img, .cinema-title-placeholder { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; background: #28201f; }
+.cinema-title-placeholder { display: grid; place-items: center; color: #e48f85; font-size: 32px; }
+.cinema-title-card strong { padding: 10px 11px 3px; }
+.cinema-title-card small { padding: 0 11px 12px; color: #c3b8b6; }

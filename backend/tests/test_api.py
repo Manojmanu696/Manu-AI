@@ -17,7 +17,10 @@ def test_media_crud(client):
     assert client.delete(f"/media/{item['id']}").status_code == 204
 
 
-def test_demo_recommendations_and_chat(client):
+def test_demo_recommendations_and_chat(client, monkeypatch):
+    from app.services import ollama
+
+    monkeypatch.setattr(ollama, "available", lambda: False)
     assert client.post("/demo/load").json()["loaded"]
     recommendations = client.get("/recommendations").json()
     assert recommendations and recommendations[0]["score"] <= 99

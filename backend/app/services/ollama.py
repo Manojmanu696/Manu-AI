@@ -33,13 +33,16 @@ def model_name() -> str | None:
                 return name
     return available[0] if available else None
 
-def chat(messages: list[dict], tools: list[dict] | None = None) -> dict:
+def chat(messages: list[dict], tools: list[dict] | None = None, *, schema: dict | None = None) -> dict:
     model = model_name()
     if not model:
         raise OllamaUnavailable("No local Ollama model is installed")
     payload = {"model": model, "messages": messages, "stream": False, "options": {"temperature": 0.2}}
     if tools:
         payload["tools"] = tools
+    if schema is not None:
+        payload.update(format=schema, think=False)
+        payload["options"].update(temperature=0, num_predict=600)
     response = _request("/api/chat", payload)
     response["_model"] = model
     return response

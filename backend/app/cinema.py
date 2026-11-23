@@ -4,12 +4,13 @@ import re
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+from pydantic import ValidationError
 
 from .config import TMDB_API_KEY
 from .database import get_db
 from .models import CatalogueItem, FilmReview, MediaItem, ViewingCheckpoint
 from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, ReviewDraftRequest
-from .services import ollama
+from .services import ollama, tvmaze, title_prediction
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, identity, search_tmdb
 from .services.discovery import _public_score, score_catalogue_item
 
@@ -123,20 +124,40 @@ def browse(db: Session = Depends(get_db)):
         "library": media,
         "catalogue": catalogue,
         "reviewed": [by_id[row.media_item_id] for row in reviews if row.media_item_id in by_id],
-        "public_search": bool(TMDB_API_KEY),
+        "public_search": True,
     }
 
 
 @router.get("/search")
-def search(query: str = Query(min_length=2, max_length=200), media_type: str = ""):
+def search(query: str = Query(min_length=2, max_length=200), media_type: str = "", db: Session = Depends(get_db)):
     if media_type and media_type not in SCREEN_TYPES:
         raise HTTPException(422, "Choose a valid media type.")
-    if not TMDB_API_KEY:
-        raise HTTPException(503, "Connect TMDB for public catalogue search.")
-    try:
-        return [dict(item, source=item["media_type"]) for item in search_tmdb(query, media_type)]
-    except Exception as exc:
-        raise HTTPException(502, "TMDB search is temporarily unavailable.") from exc
+    query = query.strip()
+    if len(query) < 2:
+        return []
+    normalized = query.casefold()
+    found = []
+    for model, source in ((MediaItem, "media"), (CatalogueItem, "catalogue")):
+        rows = db.query(model).filter(model.media_type.in_((media_type,) if media_type else SCREEN_TYPES),
+                                      model.title.icontains(query, autoescape=True)).limit(30).all()
+        found.extend(serialize_title(row, source) for row in rows)
+    if TMDB_API_KEY:
+        try:
+            found.extend(dict(item, source=item["media_type"]) for item in search_tmdb(query, media_type))
+        except (OSError, ValueError):
+            pass
+    exact_series = any(item["title"].casefold() == normalized and item["media_type"] in ("tv", "anime")
+                       for item in found)
+    if media_type != "movie" and not exact_series:
+        try:
+            found.extend(item for item in tvmaze.search_series(query) if not media_type or item["media_type"] == media_type)
+        except (OSError, ValueError):
+            pass
+    unique = {}
+    for item in found:
+        key = (item["media_type"], item["title"].strip().casefold(), item.get("release_year"))
+        unique.setdefault(key, item)
+    return sorted(unique.values(), key=lambda item: item["title"].casefold() != normalized)[:24]
 
 
 @router.get("/titles/{source}/{item_id}")
@@ -157,6 +178,17 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
         row = catalogue_record(db, item_id)
         title = serialize_title(row, source)
         owned = find_owned(db, title)
+    elif source == "tvmaze":
+        owned = db.query(MediaItem).filter_by(external_id=f"tvmaze:{item_id}").first()
+        try:
+            title = tvmaze.series_details(item_id)
+        except OSError as exc:
+            if owned is None:
+                raise HTTPException(404 if getattr(exc, "code", None) == 404 else 502,
+                                    "TVmaze title details are unavailable.") from exc
+            title = dict(serialize_title(owned, "media"), source=source, id=item_id)
+            warning = "TVmaze is temporarily unavailable. Showing your saved title."
+        owned = owned or find_owned(db, title)
     else:
         if source not in SCREEN_TYPES or item_id < 1:
             raise HTTPException(404, "Title not found.")
@@ -179,6 +211,11 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
         if enriched:
             title = {**title, **{key: value for key, value in enriched.items() if value not in ("", None)},
                      **{key: title[key] for key in ("id", "title", "description") if title.get(key)}}
+    elif source == "media" and (match := re.fullmatch(r"tvmaze:(\d+)", title.get("external_id", ""))):
+        try:
+            title = {**tvmaze.series_details(int(match[1])), **title}
+        except OSError:
+            warning = "TVmaze is temporarily unavailable. Showing your saved title."
     if row is not None:
         title["score"], title["reasons"] = score_catalogue_item(db, row)
     elif source in SCREEN_TYPES:
@@ -223,11 +260,27 @@ def public_owned(db, source, item_id):
     return db.query(MediaItem).filter_by(media_type=source, external_id=f"tmdb:{item_id}").order_by(MediaItem.id).first()
 
 
+@router.post("/titles/{source}/{item_id}/prediction")
+def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
+    title = get_title(source, item_id, "IN", db)["title"]
+    messages = title_prediction.prediction_prompt(db, title)
+    db.rollback()
+    try:
+        return title_prediction.predict(messages)
+    except ollama.OllamaUnavailable as exc:
+        raise HTTPException(503, "Local Ollama is unavailable. Start it and retry the prediction.") from exc
+    except (ValidationError, KeyError, TypeError) as exc:
+        raise HTTPException(502, "Ollama did not return a valid prediction. Please retry.") from exc
+
+
 def mutation_target(db, source, item_id, new_status):
-    if source not in ("media", "catalogue", *SCREEN_TYPES):
+    if source not in ("media", "catalogue", "tvmaze", *SCREEN_TYPES):
         raise HTTPException(404, "Title not found.")
     public_title = None
-    if source in SCREEN_TYPES:
+    if source == "tvmaze":
+        public_title = get_title(source, item_id, "IN", db)["title"]
+        db.rollback()
+    elif source in SCREEN_TYPES:
         if public_owned(db, source, item_id) is None:
             public_title = public_record(source, item_id, "IN")
         # End the preliminary read transaction before locking the SQLite writer.

@@ -7,8 +7,9 @@ import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, title
 import { Artwork, CutFrame, Glyph, Shelf, StatePanel } from "./ui";
 import { CheckpointEditor, FinalReview, ReviewEditor, Timeline } from "./journal";
 
-const sections = [["credits", "Cast & crew"], ["release", "Release & language"], ["watch", "Where to watch"], ["timeline", "Timeline"], ["review", "Final review"], ["related", "Related titles"]];
+const sections = [["prediction", "AI prediction"], ["credits", "Cast & crew"], ["release", "Release & language"], ["watch", "Where to watch"], ["timeline", "Timeline"], ["review", "Final review"], ["related", "Related titles"]];
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+type Prediction = { score: number; explanation: string; caveat: string; model: string };
 
 function TitleIntro({ title, status, busy, reviewed, setStatus, open }: {
   title: CutTitle; status: Status; busy: boolean; reviewed: boolean; setStatus: (status: Status) => void; open: (editor: "progress" | "review") => void;
@@ -58,18 +59,15 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
   const regions = [...new Set([region, "IN", "US", "GB", "CA", "AU", "DE", "FR", "JP", "KR"])];
 
   return <aside className="cut-facts">
-    {!!title.reasons?.length && <section className="cut-detail-section cut-recommendation">
-      <div className="cut-detail-section-head"><h2>Why it fits</h2>{title.score != null && <span className="cut-match">{title.score}% match</span>}</div>
-      <ul>{title.reasons.map(reason => <li key={reason}>{reason}</li>)}</ul>
-      {title.intensity && <p className="cut-muted">Intensity · {title.intensity}</p>}
-      <p className="cut-muted">The match reflects your saved viewing history and preferences.</p>
-    </section>}
     <section className="cut-detail-section" id="release">
       <h2>Release &amp; language</h2>
       <dl className="cut-fact-list">
         <div><dt>Release</dt><dd>{title.release_label || title.release_year || "Unavailable"}</dd></div>
         <div><dt>Language</dt><dd>{title.language || "Unavailable"}</dd></div>
+        {title.intensity && <div><dt>Intensity</dt><dd>{title.intensity}</dd></div>}
         <div><dt>{title.media_type === "movie" ? "Runtime" : "Length"}</dt><dd>{titleTime(title) || "Unavailable"}</dd></div>
+        {title.media_type !== "movie" && title.episodes != null && <div><dt>Episodes</dt><dd>{title.episodes}</dd></div>}
+        {title.media_type !== "movie" && title.runtime && title.seasons != null && <div><dt>Episode runtime</dt><dd>{title.runtime}</dd></div>}
       </dl>
       {source && <a href={source} target="_blank" rel="noreferrer" className="cut-text-link">{source.includes("themoviedb.org/") ? "View on TMDB" : "View title source"} <Glyph name="outward" size={16}/></a>}
     </section>
@@ -100,6 +98,21 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
   const [savingRelated, setSavingRelated] = useState("");
   const [editor, setEditor] = useState<"progress" | "review">();
   const statusBusy = useRef(false);
+  const [prediction, setPrediction] = useState<Prediction>();
+  const [predictionError, setPredictionError] = useState("");
+  const [predictionAttempt, setPredictionAttempt] = useState(0);
+  const titleLoaded = !!data;
+
+  useEffect(() => {
+    if (!titleLoaded) return;
+    const controller = new AbortController();
+    setPrediction(undefined);
+    setPredictionError("");
+    api<Prediction>(`${endpoint}/prediction`, { method: "POST", signal: controller.signal })
+      .then(result => { if (!controller.signal.aborted) setPrediction(result); })
+      .catch(failure => { if (!controller.signal.aborted) setPredictionError(messageFrom(failure)); });
+    return () => controller.abort();
+  }, [endpoint, titleLoaded, predictionAttempt]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -182,6 +195,20 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
       <TitleIntro title={data.title} status={data.title.status || "recommended"} reviewed={!!data.review} busy={busy || pendingRegion} setStatus={changeStatus} open={setEditor}/>
       <nav className="cut-jumps" aria-label="On this page"><div className="cut-container">{sections.map(([target, label]) => <a key={target} href={`#${target}`}>{label}</a>)}</div></nav>
       <div className="cut-container">
+        <section className="cut-detail-section cut-recommendation" id="prediction">
+          <div className="cut-detail-section-head">
+            <h2>AI predicted rating</h2>
+            {prediction && <strong className="cut-match">{prediction.score.toFixed(1)}/10</strong>}
+          </div>
+          {prediction ? <>
+            <p>{prediction.explanation}</p>
+            <p><strong>What could lower the score</strong> {prediction.caveat}</p>
+            <p className="cut-muted">Local Ollama · {prediction.model}</p>
+          </> : predictionError ? <>
+            <p role="alert">{predictionError}</p>
+            <button className="cut-btn cut-secondary" onClick={() => setPredictionAttempt(value => value + 1)}>Retry AI prediction</button>
+          </> : <p role="status">Ollama is estimating your rating from your taste profile…</p>}
+        </section>
         {(error || data.metadata_notice) && <p className="cut-inline-notice" role="alert">{error || data.metadata_notice} <button className="cut-text-button" onClick={() => setRetry(value => value + 1)}>Retry</button></p>}
         {pendingRegion && <p className="cut-inline-notice" role="status">Checking availability for {regionNames.of(region)}…</p>}
         <div className="cut-detail-grid">

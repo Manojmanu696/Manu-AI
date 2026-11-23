@@ -147,7 +147,7 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
       <label>Rating<select aria-label="Rating" value={rating} onChange={event => setRating(event.target.value)}><option value="">Any rating</option>{[9,8,7,6,5].map(value => <option key={value} value={value}>{value}+ / 10</option>)}</select></label>
       <label>Status<select aria-label="Status" value={status} onChange={event => setStatus(event.target.value)}><option value="">Any status</option><option value="watchlist">Watchlist</option>{Object.entries(statuses).map(([key, name]) => <option key={key} value={key}>{name}</option>)}</select></label>
     </form>
-    <div className="cut-results-head"><p role="status">{results.length} {results.length === 1 ? "title" : "titles"}{pendingPublic && " · Searching TMDB…"}</p>
+    <div className="cut-results-head"><p role="status">{results.length} {results.length === 1 ? "title" : "titles"}{pendingPublic && " · Searching catalogues…"}</p>
       {canReset && <button className="cut-text-button" onClick={() => { setQuery(""); setGenre(""); setYear(""); setType(""); setRating(""); setStatus(""); if (initialQuery || initialGenre || selectedStatus) router.replace(`/browse/${view}`, { scroll: false }); }}>Clear filters</button>}
     </div>
     {publicError && <div className="cut-inline-notice" role="alert">{publicError} <button className="cut-text-button" onClick={() => { setPublicState(undefined); setAttempt(value => value + 1); }}>Retry</button></div>}

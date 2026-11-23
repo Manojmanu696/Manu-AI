@@ -9,7 +9,7 @@ export type Credit = { name: string; role: string };
 
 export type CutTitle = {
   id: number;
-  source: "media" | "catalogue" | ScreenType;
+  source: "media" | "catalogue" | "tvmaze" | ScreenType;
   media_type: ScreenType;
   title: string;
   description?: string;
