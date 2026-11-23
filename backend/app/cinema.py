@@ -37,7 +37,8 @@ def serialize_title(item, source):
         details.update(status=item.status, personal_rating=item.personal_rating, media_id=item.id)
     else:
         details.update(imdb_rating=item.imdb_rating, public_rating=item.public_rating, seasons=item.seasons,
-                       episodes=item.episodes, ott_india=item.ott_india, intensity=item.intensity)
+                       episodes=item.episodes, ott_india=item.ott_india, intensity=item.intensity,
+                       episode_duration=item.episode_duration)
         if item.source_url:
             details["source_url"] = item.source_url
     return dict(details, source=source)

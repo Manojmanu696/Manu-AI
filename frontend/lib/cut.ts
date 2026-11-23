@@ -6,6 +6,16 @@ export const statuses = {
 } as const;
 export type Status = keyof typeof statuses;
 export type Credit = { name: string; role: string };
+export type WatchProvider = { name: string; access: string; logo_url?: string };
+export type Prediction = {
+  score: number;
+  explanation: string;
+  what_you_might_like: string[];
+  what_you_might_dislike: string[];
+  verdict: string;
+  recommendation: string;
+  model: string;
+};
 
 export type CutTitle = {
   id: number;
@@ -18,6 +28,7 @@ export type CutTitle = {
   runtime?: string;
   seasons?: number | null;
   episodes?: number | null;
+  episode_duration?: string;
   image_url?: string;
   backdrop_url?: string;
   status?: Status;
@@ -34,7 +45,7 @@ export type CutTitle = {
   trailer_url?: string;
   cast?: Credit[];
   crew?: Credit[];
-  providers?: { name: string; access: string }[];
+  providers?: WatchProvider[];
   provider_data_available?: boolean;
   watch_url?: string;
   ott_india?: string;
@@ -61,6 +72,13 @@ export const cutPath = (title: CutTitle) => `/title/${title.source}/${title.id}`
 export const titleApi = (title: CutTitle) => `/cinema/titles/${title.source}/${title.id}`;
 export const splitLabels = (text = "") => text.split(/[,|]/).map(label => label.trim()).filter(Boolean);
 export const titleTime = (title: CutTitle) => title.seasons ? `${title.seasons} ${title.seasons === 1 ? "season" : "seasons"}` : title.runtime || (title.episodes ? `${title.episodes} episodes` : "");
+export function totalWatchTime(title: CutTitle) {
+  if (title.media_type === "movie") return title.runtime;
+  const duration = /^(\d+)\s*min(?:\s+per episode)?$/i.exec(title.episode_duration || title.runtime || "");
+  if (!duration || !title.episodes) return undefined;
+  const minutes = Number(duration[1]) * title.episodes;
+  return minutes >= 60 ? `≈ ${Math.round(minutes / 60)}h` : `≈ ${minutes} min`;
+}
 export const publicRating = (title: CutTitle) => title.imdb_rating != null
   ? { value: title.imdb_rating, source: "IMDb" }
   : title.public_rating != null ? { value: title.public_rating, source: title.rating_source || "Catalogue" } : null;

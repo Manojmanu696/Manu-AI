@@ -19,13 +19,16 @@ def test_title_prediction_uses_ollama_without_target_rating(client, monkeypatch)
         assert schema["properties"]["score"]["maximum"] == 10
         return {"_model": "test-model", "message": {"content": json.dumps({
             "score": 8.6, "explanation": "The first-contact premise suits your stated taste.",
-            "caveat": "There is limited evidence about pacing.",
+            "what_you_might_like": ["The first-contact premise fits your interests.", "The mystery rewards close attention."],
+            "what_you_might_dislike": ["There is limited evidence about pacing."],
+            "verdict": "Consider", "recommendation": "Pick it when you want a thoughtful science-fiction mystery.",
         })}}
 
     monkeypatch.setattr(ollama, "chat", chat)
     route = f"/cinema/titles/media/{arrival['id']}"
     prediction = client.post(f"{route}/prediction").json()
     assert prediction["score"] == 8.6 and prediction["provider"] == "ollama"
+    assert len(prediction["what_you_might_like"]) == 2
     assert client.get(route).json()["title"]["personal_rating"] == 9
     monkeypatch.setattr(ollama, "chat", lambda *args, **kwargs: {"message": {"content": '{"score": 12}'}})
     assert client.post(f"{route}/prediction").status_code == 502
@@ -123,7 +126,7 @@ def test_tmdb_availability_is_regional_and_saved_link_has_offline_fallback(clien
             "videos": {"results": [{"site": "YouTube", "type": "Trailer", "official": True, "key": "ABCD1234xyz"}]},
             "watch/providers": {"results": {"IN": {
                 "link": "https://www.themoviedb.org/movie/430/watch?locale=IN",
-                "flatrate": [{"provider_name": "Example service"}],
+                "flatrate": [{"provider_name": "Example service", "logo_path": "/provider.png"}],
             }}},
         }
 
@@ -135,7 +138,8 @@ def test_tmdb_availability_is_regional_and_saved_link_has_offline_fallback(clien
     india = client.get(route).json()["title"]
     assert india["public_rating"] == 8.1 and india["rating_source"] == "TMDB"
     assert india["watch_url"].endswith("locale=IN")
-    assert india["providers"] == [{"name": "Example service", "access": "Subscription"}]
+    assert india["providers"] == [{"name": "Example service", "access": "Subscription",
+                                    "logo_url": "https://image.tmdb.org/t/p/original/provider.png"}]
     assert client.get(f"{route}?region=US").json()["title"]["providers"] == []
     assert client.put(f"{route}/status", json={"status": "want"}).status_code == 200
     monkeypatch.setattr(cinema, "TMDB_API_KEY", None)

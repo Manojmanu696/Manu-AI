@@ -42,7 +42,7 @@ def chat(messages: list[dict], tools: list[dict] | None = None, *, schema: dict 
         payload["tools"] = tools
     if schema is not None:
         payload.update(format=schema, think=False)
-        payload["options"].update(temperature=0, num_predict=600)
+        payload["options"].update(temperature=0, num_predict=850)
     response = _request("/api/chat", payload)
     response["_model"] = model
     return response

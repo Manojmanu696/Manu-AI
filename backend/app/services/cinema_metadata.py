@@ -64,7 +64,9 @@ def tmdb_details(media_type, item_id, region, hour):
     trailer = next((video for video in videos if video.get("official")), videos[0] if videos else None)
     provider_groups = row.get("watch/providers", {}).get("results", {}).get(region, {})
     providers = [
-        {"name": provider["provider_name"], "access": access}
+        {"name": provider["provider_name"], "access": access,
+         **({"logo_url": tmdb_image(provider["logo_path"], "original")}
+            if re.fullmatch(r"/[A-Za-z0-9_-]+\.(?:png|jpg)", provider.get("logo_path") or "") else {})}
         for group, access in (("flatrate", "Subscription"), ("free", "Free"), ("ads", "With ads"), ("rent", "Rent"), ("buy", "Buy"))
         for provider in provider_groups.get(group, [])
     ]
@@ -77,6 +79,7 @@ def tmdb_details(media_type, item_id, region, hour):
     item.update(
         genres=", ".join(genre["name"] for genre in row.get("genres", [])),
         runtime=f"{row['runtime']} min" if row.get("runtime") else "",
+        episode_duration=f"{row['episode_run_time'][0]} min" if row.get("episode_run_time") else "",
         seasons=row.get("number_of_seasons"),
         episodes=row.get("number_of_episodes"),
         language=", ".join(language["english_name"] for language in row.get("spoken_languages", []) if language.get("english_name")),

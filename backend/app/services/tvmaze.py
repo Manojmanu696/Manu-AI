@@ -24,6 +24,7 @@ def summary(show):
         "genres": ", ".join(show.get("genres") or []), "release_label": premiered,
         "release_year": int(premiered[:4]) if premiered[:4].isdigit() else None,
         "runtime": f"{runtime} min per episode" if runtime else "",
+        "episode_duration": f"{runtime} min" if runtime else "",
         "language": show.get("language"), "image_url": (show.get("image") or {}).get("original"),
         "public_rating": (show.get("rating") or {}).get("average"), "rating_source": "TVmaze",
         "source_url": show.get("url"), "external_id": f"tvmaze:{show['id']}",

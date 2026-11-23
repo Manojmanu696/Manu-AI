@@ -3,13 +3,13 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, type Checkpoint, type CutTitle, type Review, type Status, type TitleData } from "@/lib/cut";
+import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, type Checkpoint, type CutTitle, type Prediction, type Review, type Status, type TitleData } from "@/lib/cut";
 import { Artwork, CutFrame, Glyph, Shelf, StatePanel } from "./ui";
 import { CheckpointEditor, FinalReview, ReviewEditor, Timeline } from "./journal";
+import { catalogueProvider, ProviderTiles } from "./providers";
 
 const sections = [["prediction", "AI prediction"], ["credits", "Cast & crew"], ["release", "Release & language"], ["watch", "Where to watch"], ["timeline", "Timeline"], ["review", "Final review"], ["related", "Related titles"]];
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
-type Prediction = { score: number; explanation: string; caveat: string; model: string };
 
 function TitleIntro({ title, status, busy, reviewed, setStatus, open }: {
   title: CutTitle; status: Status; busy: boolean; reviewed: boolean; setStatus: (status: Status) => void; open: (editor: "progress" | "review") => void;
@@ -56,7 +56,10 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
   const { title } = data;
   const providerLink = safeUrl(title.watch_url);
   const source = safeUrl(title.source_url || title.external_url);
+  const tmdbTitle = source?.match(/^https:\/\/www\.themoviedb\.org\/(?:movie|tv)\/\d+(?:-[^/?#]+)?/);
+  const listings = providerLink || (tmdbTitle ? `${tmdbTitle[0]}/watch?locale=${data.region}` : undefined);
   const regions = [...new Set([region, "IN", "US", "GB", "CA", "AU", "DE", "FR", "JP", "KR"])];
+  const unverified = data.region === "IN" ? catalogueProvider(title) : undefined;
 
   return <aside className="cut-facts">
     <section className="cut-detail-section" id="release">
@@ -67,21 +70,22 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
         {title.intensity && <div><dt>Intensity</dt><dd>{title.intensity}</dd></div>}
         <div><dt>{title.media_type === "movie" ? "Runtime" : "Length"}</dt><dd>{titleTime(title) || "Unavailable"}</dd></div>
         {title.media_type !== "movie" && title.episodes != null && <div><dt>Episodes</dt><dd>{title.episodes}</dd></div>}
-        {title.media_type !== "movie" && title.runtime && title.seasons != null && <div><dt>Episode runtime</dt><dd>{title.runtime}</dd></div>}
+        {title.media_type !== "movie" && (title.episode_duration || title.runtime?.endsWith("per episode")) && <div><dt>Episode runtime</dt><dd>{title.episode_duration || title.runtime}</dd></div>}
       </dl>
       {source && <a href={source} target="_blank" rel="noreferrer" className="cut-text-link">{source.includes("themoviedb.org/") ? "View on TMDB" : "View title source"} <Glyph name="outward" size={16}/></a>}
     </section>
-    <section className="cut-detail-section" id="watch">
-      <div className="cut-detail-section-head"><h2>Where to watch</h2>
+    <section className="cut-detail-section cut-watch-panel" id="watch">
+      <div className="cut-detail-section-head"><h2>Where to watch in {regionNames.of(data.region)}</h2>
         {typeof title.provider_data_available === "boolean" && <label className="cut-region"><span className="cut-sr">Streaming region</span><select aria-label="Streaming region" value={region} onChange={event => onRegion(event.target.value)}>
           {regions.map(code => <option key={code} value={code}>{regionNames.of(code) || code}</option>)}
         </select></label>}
       </div>
-      {title.providers?.length ? <><ul className="cut-providers">{title.providers.map(provider => <li key={`${provider.name}-${provider.access}`}><strong>{provider.name}</strong><span>{provider.access}</span></li>)}</ul>
-        {providerLink && <a className="cut-text-link" href={providerLink} target="_blank" rel="noreferrer">See provider listings <Glyph name="outward" size={16}/></a>}
-        <p className="cut-muted">Availability for {regionNames.of(data.region)} from TMDB and JustWatch.</p></>
+      {title.providers?.length ? <><ProviderTiles providers={title.providers}/>
+        <p className="cut-muted">Streaming data from TMDB and JustWatch.</p></>
         : title.provider_data_available ? <p className="cut-muted">No providers listed for {regionNames.of(data.region)}.</p>
+        : unverified ? <><ProviderTiles providers={[unverified]}/><p className="cut-muted">Catalogue listing. Current availability is unverified.</p></>
         : <p className="cut-muted">{data.region === "IN" && title.ott_india ? `Catalogue note for India: ${title.ott_india}. Current availability is unverified.` : "Verified streaming availability is unavailable for this title."}</p>}
+      {listings && <a className="cut-text-link" href={listings} target="_blank" rel="noreferrer">Check current listings <Glyph name="outward" size={16}/></a>}
     </section>
   </aside>;
 }
@@ -195,15 +199,21 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
       <TitleIntro title={data.title} status={data.title.status || "recommended"} reviewed={!!data.review} busy={busy || pendingRegion} setStatus={changeStatus} open={setEditor}/>
       <nav className="cut-jumps" aria-label="On this page"><div className="cut-container">{sections.map(([target, label]) => <a key={target} href={`#${target}`}>{label}</a>)}</div></nav>
       <div className="cut-container">
-        <section className="cut-detail-section cut-recommendation" id="prediction">
+        <section className="cut-detail-section cut-recommendation cut-prediction" id="prediction" aria-labelledby="cut-prediction-heading">
           <div className="cut-detail-section-head">
-            <h2>AI predicted rating</h2>
-            {prediction && <strong className="cut-match">{prediction.score.toFixed(1)}/10</strong>}
+            <div>
+              <h2 id="cut-prediction-heading">AI recommendation</h2>
+              {prediction && <p className="cut-muted">Local Ollama · {prediction.model}</p>}
+            </div>
+            {prediction && <div className="cut-prediction-score"><span>Predicted rating</span><strong>{prediction.score.toFixed(1)}<small>/10</small></strong></div>}
           </div>
           {prediction ? <>
-            <p>{prediction.explanation}</p>
-            <p><strong>What could lower the score</strong> {prediction.caveat}</p>
-            <p className="cut-muted">Local Ollama · {prediction.model}</p>
+            <div className="cut-prediction-summary"><h3>Why this rating?</h3><p>{prediction.explanation}</p></div>
+            <div className="cut-prediction-points">
+              <div><h3>What you might like</h3><ul>{prediction.what_you_might_like.map((point, index) => <li key={index}>{point}</li>)}</ul></div>
+              <div><h3>What you might dislike</h3><ul>{prediction.what_you_might_dislike.map((point, index) => <li key={index}>{point}</li>)}</ul></div>
+            </div>
+            <div className="cut-prediction-verdict"><h3>{prediction.verdict}</h3><p>{prediction.recommendation}</p></div>
           </> : predictionError ? <>
             <p role="alert">{predictionError}</p>
             <button className="cut-btn cut-secondary" onClick={() => setPredictionAttempt(value => value + 1)}>Retry AI prediction</button>
