@@ -1,71 +1,71 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Sidebar } from "@/components/sidebar";
+import { Artwork } from "@/components/cut/ui";
+import { CardFacts, useTitleCard } from "@/components/cut/card-facts";
 import { api } from "@/lib/api";
-import rankings from "@/lib/top50.json";
+import { cutPath, type CutTitle } from "@/lib/cut";
 import styles from "./ranking.module.css";
 
-type Category = keyof typeof rankings;
-type Pick = (typeof rankings)["Movies"][number];
-type Metadata = {
-  title: string; release_year?: number; media_type: string; image_url?: string;
-  genres?: string; runtime?: string; episodes?: number; languages?: string;
-  episode_duration?: string; seasons?: number;
-};
-const categories: Category[] = ["Movies", "Series", "Anime"];
-const mediaType = { Movies: "movie", Series: "tv", Anime: "anime" };
-const normalize = (title: string) => title.normalize("NFKD").toLowerCase().replace(/[^a-z0-9]/g, "");
+const categories = ["Movies", "Series", "Anime"] as const;
+type Category = typeof categories[number];
+type Pick = CutTitle & { note: string };
 
-function RankedCard({ pick, rank, category }: { pick: Pick; rank: number; category: Category }) {
-  const [metadata, setMetadata] = useState<Metadata>();
-  const [imageFailed, setImageFailed] = useState(false);
-  useEffect(() => {
-    const controller = new AbortController();
-    const type = mediaType[category];
-    const params = new URLSearchParams({ media_type: type, query: pick.title, limit: "8" });
-    api<{ item: Metadata }[]>("/discover?" + params, { signal: controller.signal })
-      .then(rows => {
-        const match = rows.find(({ item }) => normalize(item.title) === normalize(pick.title) && item.release_year === pick.year && item.media_type === type);
-        if (!controller.signal.aborted) setMetadata(match?.item);
-      }).catch(() => {});
-    return () => controller.abort();
-  }, [pick.title, pick.year, category]);
-
-  return <li className={styles.card} value={rank}>
-    <div className={styles.poster}>
-      {metadata?.image_url && !imageFailed && <img src={metadata.image_url} alt="" loading="lazy" onError={() => setImageFailed(true)} />}
-      <b>#{rank}</b>
-    </div>
-    <div>
-      <small>{pick.year}{metadata?.genres && " · " + metadata.genres}</small>
-      <h2>{pick.title}</h2>
-      <p>{pick.note}</p>
-      {metadata && <small>{[metadata.runtime, metadata.seasons && metadata.seasons + " seasons", metadata.episodes && metadata.episodes + " episodes", metadata.languages].filter(Boolean).join(" · ")}</small>}
-      <a href={"https://www.justwatch.com/in/search?q=" + encodeURIComponent(pick.title)} target="_blank" rel="noreferrer">Check streaming in India ↗</a>
-    </div>
+function RankedCard({ pick, rank }: { pick: Pick; rank: number }) {
+  const card = useTitleCard(pick);
+  const title = card.title;
+  return <li value={rank}>
+    <article className={styles.card} ref={card.ref}>
+      <Link className={styles.poster} href={cutPath(title)} aria-label={`Open ${title.title}`}>
+        <Artwork title={title}/>
+        <b>#{rank}</b>
+      </Link>
+      <div className={styles.copy}>
+        <small>{[title.release_year, title.genres].filter(Boolean).join(" · ")}</small>
+        <h2><Link href={cutPath(title)}>{title.title}</Link></h2>
+        <p>{pick.note}</p>
+        <CardFacts {...card}/>
+      </div>
+    </article>
   </li>;
 }
 
 export default function Top50() {
   const [category, setCategory] = useState<Category>("Movies");
   const [page, setPage] = useState(0);
+  const [rankings, setRankings] = useState<Record<Category, Pick[]>>();
+  const [error, setError] = useState("");
+  useEffect(() => {
+    const controller = new AbortController();
+    api<Record<Category, Pick[]>>("/cinema/rankings", { signal: controller.signal })
+      .then(setRankings)
+      .catch(() => { if (!controller.signal.aborted) setError("The rankings could not be loaded."); });
+    return () => controller.abort();
+  }, []);
+
+  const picks = rankings?.[category] ?? [];
   const start = page * 5;
-  return <div className="shell cinema-shell"><Sidebar active="top50"/><main className="main">
+  return <div className="shell cinema-shell"><Sidebar active="top50"/><main className="main cut">
     <div className={styles.wrap}>
       <h1>Your Top 50</h1>
       <p>Ranked for your taste in mind games, fast hooks, rival strategists and stories that pay off.</p>
       <nav className={styles.controls} aria-label="Recommendation category">{categories.map(name =>
         <button key={name} aria-pressed={category === name} onClick={() => { setCategory(name); setPage(0); }}>{name}</button>
       )}</nav>
-      <div className={styles.pager}>
-        <strong aria-live="polite">{category} · {start + 1}–{start + 5} of 50</strong>
-        <button disabled={!page} onClick={() => setPage(page - 1)}>Previous</button>
-        <button disabled={page === 9} onClick={() => setPage(page + 1)}>Next</button>
-      </div>
-      <ol className={styles.list} start={start + 1}>{rankings[category].slice(start, start + 5).map((pick, index) =>
-        <RankedCard key={category + pick.title} pick={pick} rank={start + index + 1} category={category}/>
-      )}</ol>
+      {error && <p role="alert">{error}</p>}
+      {!rankings && !error && <p role="status">Loading rankings…</p>}
+      {!!picks.length && <>
+        <div className={styles.pager}>
+          <strong aria-live="polite">{category} · {start + 1}–{Math.min(start + 5, picks.length)} of {picks.length}</strong>
+          <button disabled={!page} onClick={() => setPage(page - 1)}>Previous</button>
+          <button disabled={start + 5 >= picks.length} onClick={() => setPage(page + 1)}>Next</button>
+        </div>
+        <ol className={styles.list} start={start + 1}>{picks.slice(start, start + 5).map((pick, index) =>
+          <RankedCard key={pick.id} pick={pick} rank={start + index + 1}/>
+        )}</ol>
+      </>}
     </div>
   </main></div>;
 }

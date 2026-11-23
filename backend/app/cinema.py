@@ -1,4 +1,7 @@
 from datetime import datetime, timezone
+from hashlib import sha256
+import json
+from pathlib import Path
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -8,15 +11,24 @@ from pydantic import ValidationError
 
 from .config import TMDB_API_KEY
 from .database import get_db
-from .models import CatalogueItem, FilmReview, MediaItem, ViewingCheckpoint
+from .models import CatalogueItem, FilmReview, LocalAIRecord, MediaItem, ViewingCheckpoint
 from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, ReviewDraftRequest
-from .services import ollama, tvmaze, title_prediction
+from .services import ollama, tvmaze, title_prediction, watch_listings
 from .services.rating_feedback import latest_feedback, title_key
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, identity, search_tmdb
 from .services.discovery import _public_score, score_catalogue_item
 from .services.local_ai_records import add_record
 
 router = APIRouter(prefix="/cinema", tags=["cinema"])
+RANKINGS = json.loads(Path(__file__).with_name("cinema_rankings.json").read_text(encoding="utf-8"))
+RANKED_TITLES = {
+    category: [
+        {"id": group * 1000 + rank, "source": "ranked", "media_type": media_type,
+         "title": pick["title"], "release_year": pick["year"], "note": pick["note"]}
+        for rank, pick in enumerate(RANKINGS[category], 1)
+    ]
+    for group, (category, media_type) in enumerate(zip(("Movies", "Series", "Anime"), SCREEN_TYPES))
+}
 
 
 def now():
@@ -106,6 +118,24 @@ def public_record(source, item_id, region):
     return dict(details, source=source)
 
 
+@router.get("/rankings")
+def rankings():
+    return RANKED_TITLES
+
+
+def ranked_record(db, item_id):
+    group, rank = divmod(item_id, 1000)
+    groups = tuple(RANKED_TITLES.values())
+    if group >= len(groups) or rank < 1 or rank > len(groups[group]):
+        raise HTTPException(404, "Title not found.")
+    pick = groups[group][rank - 1]
+    row = db.query(CatalogueItem).filter(
+        CatalogueItem.media_type == pick["media_type"], CatalogueItem.release_year == pick["release_year"],
+        CatalogueItem.title.ilike(pick["title"].replace("%", r"\%").replace("_", r"\_"), escape="\\"),
+    ).order_by(CatalogueItem.id).first()
+    return {**(serialize_title(row, "catalogue") if row else {}), **pick}
+
+
 @router.get("/browse")
 def browse(db: Session = Depends(get_db)):
     library = db.query(MediaItem).filter(MediaItem.media_type.in_(SCREEN_TYPES)).order_by(MediaItem.date_added.desc()).all()
@@ -164,7 +194,17 @@ def search(query: str = Query(min_length=2, max_length=200), media_type: str = "
 
 
 @router.get("/titles/{source}/{item_id}")
-def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-Z]{2}$"), db: Session = Depends(get_db)):
+def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-Z]{2}$"),
+              db: Session = Depends(get_db), card: bool = False):
+    result = load_title(db, source, item_id, region, card=card)
+    if card:
+        _, fingerprint = prediction_context(db, result["title"])
+        previous = cached_prediction(db, fingerprint)
+        result["prediction"] = {key: previous[key] for key in ("score", "model")} if previous else None
+    return result
+
+
+def load_title(db, source, item_id, region, *, card=False):
     owned = None
     warning = ""
     row = None
@@ -180,6 +220,9 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
     elif source == "catalogue":
         row = catalogue_record(db, item_id)
         title = serialize_title(row, source)
+        owned = find_owned(db, title)
+    elif source == "ranked":
+        title = ranked_record(db, item_id)
         owned = find_owned(db, title)
     elif source == "tvmaze":
         owned = db.query(MediaItem).filter_by(external_id=f"tvmaze:{item_id}").first()
@@ -205,7 +248,7 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
             warning = "Live TMDB metadata is unavailable. Showing your saved title."
         owned = owned or find_owned(db, title)
 
-    if source in ("media", "catalogue") and (external_id := tmdb_id(title)):
+    if source in ("media", "catalogue", "ranked") and (external_id := tmdb_id(title)):
         try:
             enriched = fetch_tmdb_details(title["media_type"], external_id, region)
         except Exception:
@@ -214,11 +257,27 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
         if enriched:
             title = {**title, **{key: value for key, value in enriched.items() if value not in ("", None)},
                      **{key: title[key] for key in ("id", "title", "description") if title.get(key)}}
-    elif source == "media" and (match := re.fullmatch(r"tvmaze:(\d+)", title.get("external_id", ""))):
+    elif source in ("media", "catalogue", "ranked") and (match := re.fullmatch(r"tvmaze:(?:tv:)?(\d+)", title.get("external_id", ""))):
         try:
             title = {**tvmaze.series_details(int(match[1])), **title}
         except OSError:
             warning = "TVmaze is temporarily unavailable. Showing your saved title."
+
+    if not title.get("provider_data_available") or not title.get("image_url"):
+        listings = watch_listings.title_listings(title, region)
+        for key in ("image_url", "genres", "description", "runtime", "episode_duration", "seasons", "episodes"):
+            if not title.get(key) and listings.get(key):
+                title[key] = listings[key]
+        if listings.get("watch_url") and not title.get("provider_data_available"):
+            title.update({key: listings[key] for key in ("providers", "watch_url", "provider_data_available")})
+            title["provider_source"] = "JustWatch"
+            if not title.get("source_url"):
+                title["source_url"] = listings["watch_url"]
+    if owned:
+        title.update(media_id=owned.id, status=owned.status, personal_rating=owned.personal_rating)
+    feedback = latest_feedback(db).get(title_key(title))
+    if card:
+        return {"title": title, "rating_feedback": feedback}
     if row is not None:
         title["score"], title["reasons"] = score_catalogue_item(db, row)
     elif source in SCREEN_TYPES:
@@ -255,7 +314,7 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
         review = db.get(FilmReview, owned.id)
     return {
         "title": title, "checkpoints": [serialize_checkpoint(point) for point in checkpoints],
-        "rating_feedback": latest_feedback(db).get(title_key(title)),
+        "rating_feedback": feedback,
         "review": serialize_review(review) if review else None, "metadata_notice": warning, "region": region,
     }
 
@@ -264,11 +323,25 @@ def public_owned(db, source, item_id):
     return db.query(MediaItem).filter_by(media_type=source, external_id=f"tmdb:{item_id}").order_by(MediaItem.id).first()
 
 
-@router.post("/titles/{source}/{item_id}/prediction")
-def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
-    details = get_title(source, item_id, "IN", db)
-    title = details["title"]
+def prediction_context(db, title):
     messages = title_prediction.prediction_prompt(db, title)
+    return messages, sha256(json.dumps(messages, sort_keys=True).encode()).hexdigest()
+
+
+def cached_prediction(db, fingerprint):
+    row = db.query(LocalAIRecord).filter(
+        LocalAIRecord.kind == "prediction", LocalAIRecord.data["context_hash"].as_string() == fingerprint,
+    ).order_by(LocalAIRecord.created_at.desc()).first()
+    return row.data["prediction"] if row else None
+
+
+@router.post("/titles/{source}/{item_id}/prediction")
+def predict_title(source: str, item_id: int, db: Session = Depends(get_db), reuse: bool = False):
+    details = load_title(db, source, item_id, "IN", card=True)
+    title = details["title"]
+    messages, fingerprint = prediction_context(db, title)
+    if reuse and (previous := cached_prediction(db, fingerprint)):
+        return previous
     db.rollback()
     try:
         prediction = title_prediction.predict(messages)
@@ -277,16 +350,16 @@ def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
     except (ValidationError, KeyError, TypeError) as exc:
         raise HTTPException(502, "Ollama did not return a valid prediction. Please retry.") from exc
     prediction["rating_feedback"] = details["rating_feedback"]
-    add_record(db, "prediction", {"title": title, "prediction": prediction})
+    add_record(db, "prediction", {"title": title, "prediction": prediction, "context_hash": fingerprint})
     db.commit()
     return prediction
 
 
 def mutation_target(db, source, item_id, new_status):
-    if source not in ("media", "catalogue", "tvmaze", *SCREEN_TYPES):
+    if source not in ("media", "catalogue", "tvmaze", "ranked", *SCREEN_TYPES):
         raise HTTPException(404, "Title not found.")
     public_title = None
-    if source == "tvmaze":
+    if source in ("tvmaze", "ranked"):
         public_title = get_title(source, item_id, "IN", db)["title"]
         db.rollback()
     elif source in SCREEN_TYPES:

@@ -39,10 +39,12 @@ def series_details(item_id):
     show = request(f"shows/{item_id}", (("embed[]", "cast"), ("embed[]", "episodes"), ("embed[]", "crew")), int(time() // 3600))
     embedded = show.get("_embedded", {})
     episodes = embedded.get("episodes", [])
+    runtimes = [episode.get("runtime") for episode in episodes]
     return {
         **summary(show),
         "episodes": len(episodes) or None,
         "seasons": len({episode["season"] for episode in episodes}) or None,
+        "total_runtime_minutes": sum(runtimes) if runtimes and all(runtimes) else None,
         "cast": [{"name": actor["person"]["name"], "role": actor["character"]["name"]}
                  for actor in embedded.get("cast", [])[:12]],
         "crew": [{"name": person["person"]["name"], "role": person["type"]}

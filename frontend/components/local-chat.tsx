@@ -18,6 +18,8 @@ type ChatRecord = {
     suggested_preference?: string | null;
     saved_preference?: string;
     rating_feedback?: RatingFeedback | null;
+    title?: { title?: string };
+    superseded?: boolean;
   };
 };
 type ChatReply = { user: ChatRecord; assistant: ChatRecord | null; error: string | null };
@@ -63,10 +65,21 @@ export function LocalChat() {
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState("");
+  const [titleLabel, setTitleLabel] = useState<{ path: string; name: string }>();
   const log = useRef<HTMLDivElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const field = useRef<HTMLTextAreaElement>(null);
-  const title = /^\/title\/(media|catalogue|movie|tv|anime|tvmaze)\/(\d+)$/.exec(path || "");
+  const title = /^\/title\/(media|catalogue|movie|tv|anime|tvmaze|ranked)\/(\d+)$/.exec(path || "");
+  const currentTitle = titleLabel && titleLabel.path === path ? titleLabel.name : undefined;
+
+  useEffect(() => {
+    if (!open || !path?.startsWith("/title/")) return;
+    const controller = new AbortController();
+    api<{ title: { title: string } }>(`/cinema${path.replace("/title/", "/titles/")}?card=true`, { signal: controller.signal })
+      .then(result => setTitleLabel({ path, name: result.title.title }))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [open, path]);
 
   useEffect(() => {
     if (!open) return;
@@ -124,7 +137,7 @@ export function LocalChat() {
     {open && <section id="local-chat-window" className="local-chat-window" role="dialog" aria-label="Local taste chat"
       onKeyDown={event => { if (event.key === "Escape") { event.stopPropagation(); close(); } }}>
       <header className="local-chat-header">
-        <div><h2>Talk to Manu</h2><p>Ollama · saved on this device</p></div>
+        <div><h2>Talk to Manu</h2><p>{title ? `Discussing ${currentTitle || "this title"}` : "General taste chat"} · saved on this device</p></div>
         <button type="button" aria-label="Close local chat" onClick={close}><Glyph name="close" size={18}/></button>
       </header>
       <div className="local-chat-links">
@@ -137,7 +150,11 @@ export function LocalChat() {
         {records.map(entry => <div className={`local-chat-message is-${entry.data.role}`} key={entry.id}>
           <div className="local-chat-author"><strong>{entry.data.role === "user" ? "You" : entry.data.model || "Manu"}</strong>
             <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></div>
-          <p>{entry.data.content}</p>
+          {entry.data.superseded ? <details>
+            <summary>Earlier reply · See the saved rating above</summary>
+            <p>{entry.data.content}</p>
+          </details> : <p>{entry.data.content}</p>}
+          {entry.data.title?.title && <small>{entry.data.title.title}</small>}
           {entry.data.rating_feedback && <p className="local-chat-saved">
             <strong>Rating feedback saved</strong><br/>
             {entry.data.rating_feedback.title} · {entry.data.rating_feedback.score.toFixed(1)}/10

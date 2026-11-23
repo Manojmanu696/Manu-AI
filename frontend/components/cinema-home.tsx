@@ -4,6 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { api, MediaItem, Recommendation } from "@/lib/api";
 import SearchExperience from "./search-experience";
 import Link from "next/link";
+import { Poster } from "./cut/ui";
+import { CardFacts, useTitleCard } from "./cut/card-facts";
+import { cutPath, mediaTypes, type CutTitle } from "@/lib/cut";
 
 type Title = Pick<MediaItem, "id" | "title" | "media_type" | "description" | "genres" | "tags" | "runtime" | "release_year" | "image_url"> & {
   imdb_rating?: number | null;
@@ -13,6 +16,22 @@ type Title = Pick<MediaItem, "id" | "title" | "media_type" | "description" | "ge
 };
 type PickEntry = { item: Title; score?: number; reasons?: string[]; source?: string };
 const types: Record<string, string> = { movie: "Film", tv: "Series", anime: "Anime", game: "Game", book: "Book" };
+
+function screenTitle(entry: PickEntry): CutTitle | undefined {
+  const { item } = entry;
+  if (!(item.media_type in mediaTypes)) return;
+  const media_type = item.media_type as CutTitle["media_type"];
+  const source = entry.source === "public_tmdb" ? media_type : entry.source === "local_catalogue" ? "catalogue" : "media";
+  return { ...item, source, media_type, release_year: item.release_year ?? undefined,
+    ...(source === "media" ? { media_id: item.id } : {}) };
+}
+
+function FeaturedFacts({ title }: { title: CutTitle }) {
+  const card = useTitleCard(title);
+  return <section className="cinema-featured-facts cut" ref={card.ref} aria-label={`Watch details for ${title.title}`}>
+    <CardFacts {...card}/>
+  </section>;
+}
 
 function Artwork({ item, featured = false }: { item?: Title; featured?: boolean }) {
   const [failedUrl, setFailedUrl] = useState<string>();
@@ -36,8 +55,11 @@ function Section({ title, entries, onOpen, href }: {
         <h2>{title}</h2>
         {href && <Link href={href} aria-label={`View all: ${title}`}>View all <span aria-hidden="true">→</span></Link>}
       </header>
-      <div className="cinema-grid">
-        {entries.map(entry => (
+      <div className="cinema-grid cut">
+        {entries.map(entry => {
+          const screen = screenTitle(entry);
+          if (screen) return <Poster key={cutPath(screen)} title={screen}/>;
+          return (
           <button key={entry.item.id} className="cinema-tile" onClick={() => onOpen(entry)}>
             <Artwork item={entry.item} />
             <span className="cinema-tile-copy">
@@ -46,7 +68,8 @@ function Section({ title, entries, onOpen, href }: {
               {entry.score != null && <span className="cinema-match">{entry.score}% match</span>}
             </span>
           </button>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -123,6 +146,7 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
   const featured = feed.filter(entry => ["movie", "tv", "anime"].includes(entry.item.media_type)).slice(0, 3);
   const slides = featured.length ? featured : feed.slice(0, 3);
   const hero = slides[active % (slides.length || 1)];
+  const heroScreen = hero && screenTitle(hero);
   const continueEntries = items.filter(item => item.status === "current").slice(0, 8).map(item => ({ item }));
   const savedEntries = items.filter(item => item.status === "want" || item.status === "on_hold").slice(0, 8).map(item => ({ item }));
 
@@ -155,7 +179,8 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
               </p>}
               <p className="cinema-synopsis">{hero?.item.description || (hero ? hero.reasons?.[0] : "Discover films, series, anime, games and books.")}</p>
               <div className="cinema-actions">
-                {hero && <button className="cinema-button cinema-primary" onClick={() => setDetail(hero)}>View title <span aria-hidden="true">↗</span></button>}
+                {heroScreen ? <Link href={cutPath(heroScreen)} className="cinema-button cinema-primary">View title <span aria-hidden="true">↗</span></Link>
+                  : hero && <button className="cinema-button cinema-primary" onClick={() => setDetail(hero)}>View title <span aria-hidden="true">↗</span></button>}
                 <Link className="cinema-button" href="/browse/discover">Explore catalogue</Link>
               </div>
             </div>
@@ -170,6 +195,7 @@ export default function CinemaHome({ items, recommendations, onRefresh }: {
               <button className="cinema-step" aria-label="Next title" onClick={() => setActive((active + 1) % slides.length)}>›</button>
             </div>}
           </section>
+          {heroScreen && <FeaturedFacts key={cutPath(heroScreen)} title={heroScreen}/>}
           {status === "loading" && <p className="cinema-status" role="status">Loading recommendations…</p>}
           {status === "error" && <p className="cinema-status" role="status">The discovery catalogue is currently unavailable.</p>}
           <Section title="Continue where you left off" entries={continueEntries} onOpen={setDetail} href="/browse/library?status=current" />

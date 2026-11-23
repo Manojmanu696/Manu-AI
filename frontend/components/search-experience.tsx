@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { Poster } from "./cut/ui";
 import { CutTitle, cutPath, mediaTypes, messageFrom } from "@/lib/cut";
 
 export default function SearchExperience({ browse }: { browse: ReactNode }) {
@@ -78,12 +79,8 @@ export default function SearchExperience({ browse }: { browse: ReactNode }) {
       {busy && <p role="status">Looking up titles…</p>}
       {error && <p role="alert">{error}</p>}
       {!busy && !error && !titles.length && <p>No matching titles found. Try another spelling or category.</p>}
-      <div className="cinema-title-cards">
-        {titles.map(title => <Link key={cutPath(title)} className="cinema-title-card" href={cutPath(title)}>
-          {title.image_url ? <img src={title.image_url} alt="" loading="lazy"/> : <div className="cinema-title-placeholder" aria-hidden="true">◈</div>}
-          <strong>{title.title}</strong>
-          <small>{[mediaTypes[title.media_type], title.release_year].filter(Boolean).join(" · ")}</small>
-        </Link>)}
+      <div className="cut cut-grid cinema-title-cards">
+        {titles.map(title => <Poster key={cutPath(title)} title={title}/>)}
       </div>
     </section>}
   </section>;

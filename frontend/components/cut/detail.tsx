@@ -1,12 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { api } from "@/lib/api";
-import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, type Checkpoint, type CutTitle, type Prediction, type RatingFeedback, type Review, type Status, type TitleData } from "@/lib/cut";
+import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, totalWatchTime, type Checkpoint, type CutTitle, type Prediction, type RatingFeedback, type Review, type Status, type TitleData } from "@/lib/cut";
 import { Artwork, CutFrame, Glyph, Shelf, StatePanel } from "./ui";
 import { CheckpointEditor, FinalReview, ReviewEditor, Timeline } from "./journal";
-import { catalogueProvider, ProviderTiles } from "./providers";
+import { catalogueProviders, ProviderTiles, streamingListings } from "./providers";
 
 const sections = [["prediction", "AI prediction"], ["credits", "Cast & crew"], ["release", "Release & language"], ["watch", "Where to watch"], ["timeline", "Timeline"], ["review", "Final review"], ["related", "Related titles"]];
 const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
@@ -54,12 +54,10 @@ function TitleIntro({ title, status, busy, reviewed, setStatus, open }: {
 
 function TitleFacts({ data, region, onRegion }: { data: TitleData; region: string; onRegion: (region: string) => void }) {
   const { title } = data;
-  const providerLink = safeUrl(title.watch_url);
   const source = safeUrl(title.source_url || title.external_url);
-  const tmdbTitle = source?.match(/^https:\/\/www\.themoviedb\.org\/(?:movie|tv)\/\d+(?:-[^/?#]+)?/);
-  const listings = providerLink || (tmdbTitle ? `${tmdbTitle[0]}/watch?locale=${data.region}` : undefined);
+  const listings = streamingListings(title, data.region);
   const regions = [...new Set([region, "IN", "US", "GB", "CA", "AU", "DE", "FR", "JP", "KR"])];
-  const unverified = data.region === "IN" ? catalogueProvider(title) : undefined;
+  const unverified = data.region === "IN" ? catalogueProviders(title) : [];
 
   return <aside className="cut-facts">
     <section className="cut-detail-section" id="release">
@@ -70,6 +68,7 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
         {title.intensity && <div><dt>Intensity</dt><dd>{title.intensity}</dd></div>}
         <div><dt>{title.media_type === "movie" ? "Runtime" : "Length"}</dt><dd>{titleTime(title) || "Unavailable"}</dd></div>
         {title.media_type !== "movie" && title.episodes != null && <div><dt>Episodes</dt><dd>{title.episodes}</dd></div>}
+        {title.media_type !== "movie" && <div><dt>Total watch time</dt><dd>{totalWatchTime(title) || "Unavailable"}</dd></div>}
         {title.media_type !== "movie" && (title.episode_duration || title.runtime?.endsWith("per episode")) && <div><dt>Episode runtime</dt><dd>{title.episode_duration || title.runtime}</dd></div>}
       </dl>
       {source && <a href={source} target="_blank" rel="noreferrer" className="cut-text-link">{source.includes("themoviedb.org/") ? "View on TMDB" : "View title source"} <Glyph name="outward" size={16}/></a>}
@@ -81,13 +80,43 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
         </select></label>}
       </div>
       {title.providers?.length ? <><ProviderTiles providers={title.providers}/>
-        <p className="cut-muted">Streaming data from TMDB and JustWatch.</p></>
+        <p className="cut-muted">Streaming data from {title.provider_source || "TMDB and JustWatch"}.</p></>
         : title.provider_data_available ? <p className="cut-muted">No providers listed for {regionNames.of(data.region)}.</p>
-        : unverified ? <><ProviderTiles providers={[unverified]}/><p className="cut-muted">Catalogue listing. Current availability is unverified.</p></>
+        : unverified.length ? <><ProviderTiles providers={unverified}/><p className="cut-muted">Catalogue listing. Current availability is unverified.</p></>
         : <p className="cut-muted">{data.region === "IN" && title.ott_india ? `Catalogue note for India: ${title.ott_india}. Current availability is unverified.` : "Verified streaming availability is unavailable for this title."}</p>}
       {listings && <a className="cut-text-link" href={listings} target="_blank" rel="noreferrer">Check current listings <Glyph name="outward" size={16}/></a>}
     </section>
   </aside>;
+}
+
+function RatingForm({ title, feedback, onSaved }: { title: CutTitle; feedback: RatingFeedback | null; onSaved: (rating: RatingFeedback) => void }) {
+  const [score, setScore] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  async function save(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      onSaved(await api<RatingFeedback>(`/local-chat/feedback/${title.source}/${title.id}`, {
+        method: "POST", body: JSON.stringify({ score: Number(score) }),
+      }));
+      setScore("");
+    } catch (failure) {
+      setError(messageFrom(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return <form className="cut-rating-feedback" onSubmit={save}>
+    <label htmlFor="cut-feedback-score">Your score for {title.title}</label>
+    <div>
+      <input id="cut-feedback-score" type="number" inputMode="decimal" min={1} max={10} step={0.1} required
+        placeholder={feedback ? feedback.score.toFixed(1) : "1–10"} value={score} onChange={event => setScore(event.target.value)}/>
+      <button type="submit" className="cut-btn cut-secondary" disabled={busy || !score}>{busy ? "Saving…" : "Save rating feedback"}</button>
+    </div>
+    {error && <p role="alert">{error}</p>}
+  </form>;
 }
 
 export function CutDetail({ source, id }: { source: string; id: string }) {
@@ -124,7 +153,7 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
     const controller = new AbortController();
     setPrediction(undefined);
     setPredictionError("");
-    api<Prediction>(`${endpoint}/prediction`, { method: "POST", signal: controller.signal })
+    api<Prediction>(`${endpoint}/prediction?reuse=${predictionAttempt === 0}`, { method: "POST", signal: controller.signal })
       .then(result => {
         if (controller.signal.aborted) return;
         setPrediction(result);
@@ -227,7 +256,7 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
             </div>}
           </div>
           {data.rating_feedback && <p className="cut-muted">
-            Saved from your chat and used in future predictions.
+            Saved for {data.title.title} and used in future predictions.
             {prediction && <> AI prediction with your latest profile · {prediction.score.toFixed(1)}/10</>}
           </p>}
           {prediction ? <>
@@ -244,6 +273,9 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
             <p role="alert">{predictionError}</p>
             <button className="cut-btn cut-secondary" onClick={() => setPredictionAttempt(value => value + 1)}>Retry AI prediction</button>
           </> : <p role="status">Ollama is estimating your rating from your taste profile…</p>}
+          <RatingForm title={data.title} feedback={data.rating_feedback} onSaved={rating => {
+            window.dispatchEvent(new CustomEvent("manu-taste-updated", { detail: { source, id, rating } }));
+          }}/>
         </section>
         {(error || data.metadata_notice) && <p className="cut-inline-notice" role="alert">{error || data.metadata_notice} <button className="cut-text-button" onClick={() => setRetry(value => value + 1)}>Retry</button></p>}
         {pendingRegion && <p className="cut-inline-notice" role="status">Checking availability for {regionNames.of(region)}…</p>}

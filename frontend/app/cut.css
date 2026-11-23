@@ -376,3 +376,37 @@
   .cut-prediction-points { grid-template-columns: 1fr; }
   .cut-prediction-score { padding-inline: 8px; }
 }
+
+/* Keep card width tied to the shelf's available space, including beside the sidebar. */
+.cut .cut-track { grid-auto-columns: clamp(180px, 17%, 232px); }
+.cut .cut-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 170px), 1fr)); }
+.cut .cut-poster {
+  border: 1px solid var(--cut-border);
+  border-radius: 13px;
+  background: var(--cut-panel);
+  overflow: hidden;
+}
+.cut .cut-poster:hover { border-color: #8b7566; }
+.cut .cut-poster-link { height: auto; border: 0; border-radius: 0; }
+.cut .cut-poster-link:hover h3 { text-decoration: underline; }
+.cut .cut-poster-image img, .cut .cut-art:not(.cut-art-wide) img { object-fit: contain; }
+.cut-card-facts { min-width: 0; font-size: 12px; color: var(--cut-muted); overflow-wrap: anywhere; }
+.cut-poster > .cut-card-facts { padding: 0 12px 14px; }
+.cut-card-facts dl { display: flex; flex-wrap: wrap; gap: 7px 14px; }
+.cut-card-facts dd { color: var(--cut-text); font-weight: 700; }
+.cut-poster-providers > a { display: inline-block; color: var(--cut-accent); margin-top: 6px; }
+.cut-poster-providers > a:hover, .cut-provider-tile a:hover strong { text-decoration: underline; }
+.cut-provider-tile a { display: flex; align-items: center; gap: 7px; min-width: 0; width: 100%; }
+.cut-provider-tile a div { min-width: 0; }
+.cut .cut-poster-providers .cut-provider-tiles { margin: 5px 0 0; }
+.cut-rating-feedback { border-top: 1px solid var(--cut-border); margin-top: 22px; padding-top: 15px; }
+.cut-rating-feedback label { display: block; font-weight: 700; margin-bottom: 6px; }
+.cut-rating-feedback > div { display: flex; flex-wrap: wrap; gap: 8px; }
+.cut-rating-feedback input {
+  width: 100px; min-height: 44px; padding: 8px;
+  color: var(--cut-text); background: var(--cut-bg); border: 1px solid var(--cut-border); border-radius: 7px;
+}
+@media (max-width: 680px) {
+  .cut .cut-track { grid-auto-columns: clamp(150px, 49%, 205px); }
+  .cut .cut-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 145px), 1fr)); }
+}

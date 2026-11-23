@@ -16,6 +16,12 @@ def extract_rating_feedback(message, title):
     statement = r"(?:\bi(?:\s+would|['’]d)|(?:^|[.!]\s+)i)"
     pattern = rf"{statement}\s+(?:rate|give)\s+{target}\s+(?:at\s+)?{score}(?!\s*\?)"
     matches = re.findall(pattern, message, re.IGNORECASE)
+    if not matches:
+        matches = re.findall(
+            rf"(?:^|[.!]\s+)(?:this|it|{name})\s+is\s+(?:just\s+)?{score}"
+            r"\s+(?:title\s+|show\s+|series\s+|movie\s+|film\s+|anime\s+)?(?:for me|in my opinion)(?!\s*\?)",
+            message, re.IGNORECASE,
+        )
     # Older voice-transcribed messages can say "read" when asking to update a score.
     if not matches and re.search(r"\bupdate\s+(?:your|the|my)\s+(?:score|rating)\b", message, re.IGNORECASE):
         matches = re.findall(rf"\bi\s+would\s+read\s+{target}\s+{score}", message, re.IGNORECASE)
@@ -34,7 +40,7 @@ def record_feedback(record):
     title = data.get("title")
     if not isinstance(title, dict) or not isinstance(title.get("title"), str):
         return None
-    if "rating_feedback" not in data:
+    if data.get("rating_feedback") is None:
         return extract_rating_feedback(data["content"], title)
     rating = data["rating_feedback"]
     if isinstance(rating, dict) and type(rating.get("score")) in (int, float) and 1 <= rating["score"] <= 10:

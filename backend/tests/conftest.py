@@ -9,10 +9,12 @@ import pytest
 from fastapi.testclient import TestClient
 from app.database import Base, engine
 from app.main import app
+from app.services import watch_listings
 
 
 @pytest.fixture(autouse=True)
-def clean_db():
+def clean_db(monkeypatch):
+    monkeypatch.setattr(watch_listings, "title_listings", lambda *args: {})
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     yield

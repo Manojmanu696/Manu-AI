@@ -6,7 +6,7 @@ export const statuses = {
 } as const;
 export type Status = keyof typeof statuses;
 export type Credit = { name: string; role: string };
-export type WatchProvider = { name: string; access: string; logo_url?: string };
+export type WatchProvider = { name: string; access: string; logo_url?: string; url?: string };
 export type RatingFeedback = { score: number; title: string };
 
 export type Prediction = {
@@ -22,7 +22,7 @@ export type Prediction = {
 
 export type CutTitle = {
   id: number;
-  source: "media" | "catalogue" | "tvmaze" | ScreenType;
+  source: "media" | "catalogue" | "tvmaze" | "ranked" | ScreenType;
   media_type: ScreenType;
   title: string;
   description?: string;
@@ -32,6 +32,7 @@ export type CutTitle = {
   seasons?: number | null;
   episodes?: number | null;
   episode_duration?: string;
+  total_runtime_minutes?: number;
   image_url?: string;
   backdrop_url?: string;
   status?: Status;
@@ -50,6 +51,7 @@ export type CutTitle = {
   crew?: Credit[];
   providers?: WatchProvider[];
   provider_data_available?: boolean;
+  provider_source?: string;
   watch_url?: string;
   ott_india?: string;
   score?: number;
@@ -78,9 +80,11 @@ export const titleTime = (title: CutTitle) => title.seasons ? `${title.seasons} 
 export function totalWatchTime(title: CutTitle) {
   if (title.media_type === "movie") return title.runtime;
   const duration = /^(\d+)\s*min(?:\s+per episode)?$/i.exec(title.episode_duration || title.runtime || "");
-  if (!duration || !title.episodes) return undefined;
-  const minutes = Number(duration[1]) * title.episodes;
-  return minutes >= 60 ? `≈ ${Math.round(minutes / 60)}h` : `≈ ${minutes} min`;
+  const minutes = title.total_runtime_minutes || (duration && title.episodes ? Number(duration[1]) * title.episodes : 0);
+  if (!minutes) return undefined;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return `${title.total_runtime_minutes ? "" : "≈ "}${hours ? hours + "h" : ""}${hours && remainder ? " " : ""}${remainder ? remainder + "m" : ""}`;
 }
 export const publicRating = (title: CutTitle) => title.imdb_rating != null
   ? { value: title.imdb_rating, source: "IMDb" }

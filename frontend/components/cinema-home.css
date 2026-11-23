@@ -308,3 +308,21 @@
 .cinema-title-placeholder { display: grid; place-items: center; color: #e48f85; font-size: 32px; }
 .cinema-title-card strong { padding: 10px 11px 3px; }
 .cinema-title-card small { padding: 0 11px 12px; color: #c3b8b6; }
+
+.cinema-grid.cut, .cinema-title-cards.cut, .discovery-shell .cards.cut { min-height: 0; background: transparent; }
+.cinema-grid.cut .cinema-tile { align-self: start; }
+.cinema-title-cards.cut { margin-top: 15px; }
+.cinema-featured-facts.cut {
+  min-height: 0;
+  border: 1px solid var(--cut-border);
+  border-radius: 0 0 12px 12px;
+  padding: 12px 16px;
+}
+.cinema-featured-facts .cut-card-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 20px;
+}
+.cinema-featured-facts .cut-poster-providers { margin-top: 0; }
+.cinema-featured-facts .cut-poster-providers .cut-provider-tile { width: auto; }

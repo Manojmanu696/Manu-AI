@@ -78,7 +78,7 @@ def test_saved_score_calibrates_current_and_similar_title_predictions(client, mo
         "message": "I'd give Game of Thrones a 9.5/10.", "title_source": "catalogue", "title_id": catalogue_id,
     }).json()
     assert response["user"]["data"]["rating_feedback"]["score"] == 9.5
-    assert response["assistant"] is None
+    assert "9.5/10 feedback for Game of Thrones" in response["assistant"]["data"]["content"]
     saved = client.put(f"{route}/status", json={"status": "want"}).json()
     media_route = f"/cinema/titles/media/{saved['media_id']}"
     assert client.get(media_route).json()["rating_feedback"]["score"] == 9.5
@@ -131,3 +131,40 @@ def test_complete_chat_download_includes_older_messages_and_reference_data(clien
     assert payload["catalogue_items"][0]["title"] == "Export example"
     assert payload["recommendation_feedback"][0]["action"] == "like"
     assert payload["research_sources"][0]["url"] == "https://example.com/title"
+
+
+def test_feedback_stays_with_active_title(client, monkeypatch):
+    from app.services import tvmaze
+
+    previous = {"title": "Game of Thrones", "media_type": "tv", "release_year": 2011}
+    active = {"title": "Chainsaw Man", "media_type": "anime", "release_year": 2022, "id": 63451, "source": "tvmaze"}
+    monkeypatch.setattr(tvmaze, "series_details", lambda _: active.copy())
+    with SessionLocal() as db:
+        db.add(CatalogueItem(**previous))
+        old = add_record(db, "chat", {"role": "user", "content": "I would rate it 9.4.", "title": previous})
+        add_record(db, "chat", {"role": "assistant", "content": "Discussion of the Iron Throne.", "reply_to": old.id})
+        add_record(db, "chat", {"role": "user", "content": "This is just a 6.5 movie for me",
+                                "title": active, "rating_feedback": None})
+        db.commit()
+
+    assert client.get("/cinema/titles/tvmaze/63451").json()["rating_feedback"]["score"] == 6.5
+    reply = client.post("/local-chat", json={
+        "message": "This is just a 6.6 movie for me", "title_source": "tvmaze", "title_id": 63451,
+    }).json()
+    assert reply["assistant"]["data"]["content"] == "Saved your 6.6/10 feedback for Chainsaw Man."
+    changed = client.post("/local-chat/feedback/tvmaze/63451", json={"score": 6.5})
+    assert changed.json()["score"] == 6.5
+    assert client.get("/cinema/titles/catalogue/1").json()["rating_feedback"]["score"] == 9.4
+    assert client.post("/local-chat/feedback/tvmaze/63451", json={"score": 11}).status_code == 422
+
+    def respond(messages, *, schema):
+        assert '"title": "Chainsaw Man"' in messages[0]["content"]
+        assert all("Iron Throne" not in message["content"] for message in messages[1:])
+        assert all("I would rate it 9.4." != message["content"] for message in messages[1:])
+        return {"_model": "test", "message": {"content": '{"answer":"Discussing Chainsaw Man.", "suggested_preference":null}'}}
+
+    monkeypatch.setattr(ollama, "chat", respond)
+    reply = client.post("/local-chat", json={
+        "message": "What do you think of this?", "title_source": "tvmaze", "title_id": 63451,
+    }).json()
+    assert reply["assistant"]["data"]["title"]["title"] == "Chainsaw Man"

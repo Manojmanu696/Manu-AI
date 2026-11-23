@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Sidebar } from "@/components/sidebar";
 import { usePathname, useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
-import { cardRating, cutPath, mediaTypes, safeUrl, splitLabels, statuses, totalWatchTime, type CutTitle } from "@/lib/cut";
-import { catalogueProvider, ProviderTiles } from "./providers";
+import { cardRating, cutPath, mediaTypes, safeUrl, splitLabels, statuses, type CutTitle } from "@/lib/cut";
+import { CardFacts, useTitleCard } from "./card-facts";
 
 const glyphs = {
   film: <><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4m-4 6h4m10-6h4m-4 6h4"/></>,
@@ -92,13 +92,12 @@ export function Artwork({ title, backdrop = false, eager = false, sizes }: { tit
   );
 }
 
-export function Poster({ title, pending, onSave }: { title: CutTitle; pending?: boolean; onSave?: (title: CutTitle) => void }) {
+export function Poster({ title: initial, pending, onSave }: { title: CutTitle; pending?: boolean; onSave?: (title: CutTitle) => void }) {
+  const card = useTitleCard(initial);
+  const title = card.title;
   const rating = cardRating(title);
-  const unverified = catalogueProvider(title);
-  const providers = title.providers?.length ? title.providers : !title.provider_data_available && unverified ? [unverified] : [];
-  const watchTime = totalWatchTime(title);
   return (
-    <article className="cut-poster">
+    <article className="cut-poster" ref={card.ref}>
       <Link href={cutPath(title)} className="cut-poster-link">
         <div className="cut-poster-image">
           <Artwork title={title}/>
@@ -108,14 +107,10 @@ export function Poster({ title, pending, onSave }: { title: CutTitle; pending?: 
           <h3>{title.title}</h3>
           <div className="cut-poster-meta">{[
             title.release_year, mediaTypes[title.media_type], splitLabels(title.genres)[0],
-            title.media_type !== "movie" && title.episodes ? `${title.episodes} eps` : "",
           ].filter(Boolean).join(" · ")}</div>
-          {!!providers.length && <div className="cut-poster-providers">
-            <span>Watch in India</span><ProviderTiles providers={providers.slice(0, 2)}/>
-          </div>}
-          {watchTime && <div className="cut-poster-time"><span>{title.media_type === "movie" ? "Runtime" : "Total watch time"}</span> <strong>{watchTime}</strong></div>}
         </div>
       </Link>
+      <CardFacts {...card}/>
       {onSave && (!title.media_id || title.status === "recommended"
         ? <button className="cut-card-save" type="button" disabled={pending} onClick={() => onSave(title)} aria-label={`Save ${title.title} to watchlist`} title="Save to watchlist"><Glyph name="bookmark" size={18}/></button>
         : <Link className="cut-card-save is-saved" href={cutPath(title)} title={title.status ? statuses[title.status] : "In your library"} aria-label={`${title.title} is in your library. Open title`}><Glyph name="check" size={18}/></Link>)}
