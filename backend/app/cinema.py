@@ -11,6 +11,7 @@ from .database import get_db
 from .models import CatalogueItem, FilmReview, MediaItem, ViewingCheckpoint
 from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, ReviewDraftRequest
 from .services import ollama, tvmaze, title_prediction
+from .services.rating_feedback import latest_feedback, title_key
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, identity, search_tmdb
 from .services.discovery import _public_score, score_catalogue_item
 from .services.local_ai_records import add_record
@@ -254,6 +255,7 @@ def get_title(source: str, item_id: int, region: str = Query("IN", pattern="^[A-
         review = db.get(FilmReview, owned.id)
     return {
         "title": title, "checkpoints": [serialize_checkpoint(point) for point in checkpoints],
+        "rating_feedback": latest_feedback(db).get(title_key(title)),
         "review": serialize_review(review) if review else None, "metadata_notice": warning, "region": region,
     }
 
@@ -264,7 +266,8 @@ def public_owned(db, source, item_id):
 
 @router.post("/titles/{source}/{item_id}/prediction")
 def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
-    title = get_title(source, item_id, "IN", db)["title"]
+    details = get_title(source, item_id, "IN", db)
+    title = details["title"]
     messages = title_prediction.prediction_prompt(db, title)
     db.rollback()
     try:
@@ -273,6 +276,7 @@ def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
         raise HTTPException(503, "Local Ollama is unavailable. Start it and retry the prediction.") from exc
     except (ValidationError, KeyError, TypeError) as exc:
         raise HTTPException(502, "Ollama did not return a valid prediction. Please retry.") from exc
+    prediction["rating_feedback"] = details["rating_feedback"]
     add_record(db, "prediction", {"title": title, "prediction": prediction})
     db.commit()
     return prediction

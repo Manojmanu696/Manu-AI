@@ -7,6 +7,7 @@ from ..models import MediaItem, Memory
 from .recommendations import recommendations
 from .internet import tool_definitions, execute_tool
 from .ollama import chat as ollama_chat, OllamaUnavailable
+from .rating_feedback import latest_feedback
 
 class AIProvider(ABC):
     @abstractmethod
@@ -17,14 +18,16 @@ def retrieve_context(db: Session, query: str) -> dict:
     memories = db.query(Memory).order_by(Memory.created_at.desc()).limit(30).all()
     q = query.lower()
     relevant = [i for i in items if any(term in (i.title + " " + i.genres + " " + i.tags).lower() for term in q.split() if len(term) > 2)]
-    return {"items": relevant[:20] or items[:20], "memories": memories}
+    return {"items": relevant[:20] or items[:20], "memories": memories,
+            "rating_feedback": list(latest_feedback(db).values())[:30]}
 
 def _context_text(context: dict) -> str:
     items = []
     for i in context["items"]:
         items.append({"title": i.title, "type": i.media_type, "rating": i.personal_rating, "status": i.status, "genres": i.genres, "tags": i.tags, "notes": i.notes})
     memories = [{"category": m.category, "content": m.content, "source": m.source, "confidence": m.confidence} for m in context["memories"]]
-    return json.dumps({"library": items, "memory": memories}, ensure_ascii=False)
+    return json.dumps({"library": items, "memory": memories,
+                       "rating_feedback": context["rating_feedback"]}, ensure_ascii=False)
 
 class LocalProvider(AIProvider):
     def __init__(self, db: Session): self.db = db

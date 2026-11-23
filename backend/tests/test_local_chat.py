@@ -2,7 +2,11 @@ import io
 import json
 import zipfile
 
+from app.database import SessionLocal
+from app.models import CatalogueItem, RecommendationFeedback, ResearchSource
 from app.services import ollama
+from app.services.local_ai_records import add_record
+from app.services.rating_feedback import extract_rating_feedback
 
 
 def test_chat_memory_and_portable_history(client, monkeypatch):
@@ -47,3 +51,83 @@ def test_offline_chat_preserves_user_message(client, monkeypatch):
     response = client.post("/local-chat", json={"message": "I prefer shorter movies."}).json()
     assert response["assistant"] is None and response["error"]
     assert client.get("/local-chat").json()[0]["data"]["content"] == "I prefer shorter movies."
+
+
+def test_saved_score_calibrates_current_and_similar_title_predictions(client, monkeypatch):
+    legacy = ("I think your game of thrones score is less for me. "
+              "I would read it around 9.4, so can you update your score and your memory")
+    title = {"title": "Game of Thrones", "media_type": "tv", "genres": "Fantasy, Drama", "release_year": 2011}
+    with SessionLocal() as db:
+        candidate = CatalogueItem(**title)
+        db.add(candidate)
+        add_record(db, "chat", {"role": "user", "content": legacy, "title": title})
+        db.commit()
+        catalogue_id = candidate.id
+    route = f"/cinema/titles/catalogue/{catalogue_id}"
+    assert client.get(route).json()["rating_feedback"]["score"] == 9.4
+    assert client.get("/local-chat").json()[0]["data"]["rating_feedback"]["score"] == 9.4
+    assert extract_rating_feedback("Would I rate it 9.4?", title) is None
+    assert extract_rating_feedback("I would rate it 9.4 or 8.9.", title) is None
+    assert extract_rating_feedback("I would rate it 9.44.", title) is None
+
+    def offline(*args, **kwargs):
+        raise ollama.OllamaUnavailable("offline")
+
+    monkeypatch.setattr(ollama, "chat", offline)
+    response = client.post("/local-chat", json={
+        "message": "I'd give Game of Thrones a 9.5/10.", "title_source": "catalogue", "title_id": catalogue_id,
+    }).json()
+    assert response["user"]["data"]["rating_feedback"]["score"] == 9.5
+    assert response["assistant"] is None
+    saved = client.put(f"{route}/status", json={"status": "want"}).json()
+    media_route = f"/cinema/titles/media/{saved['media_id']}"
+    assert client.get(media_route).json()["rating_feedback"]["score"] == 9.5
+    assert client.get(media_route).json()["title"]["personal_rating"] is None
+
+    prompts = []
+
+    def predict(messages, *, schema):
+        prompts.append(json.loads(messages[-1]["content"]))
+        return {"_model": "test-model", "message": {"content": json.dumps({
+            "score": 9.3, "explanation": "Your feedback shows you enjoy this style of fantasy.",
+            "what_you_might_like": ["The political intrigue drives the story.", "The ensemble gives the story depth."],
+            "what_you_might_dislike": ["The pace varies between storylines."],
+            "verdict": "Worth prioritizing", "recommendation": "Choose it when you want a complex fantasy drama.",
+        })}}
+
+    monkeypatch.setattr(ollama, "chat", predict)
+    result = client.post(f"{media_route}/prediction").json()
+    assert result["score"] == 9.3 and result["rating_feedback"]["score"] == 9.5
+    assert prompts[0]["title_rating_feedback"]["score"] == 9.5
+    related = client.post("/media", json={"title": "Another fantasy", "media_type": "tv", "genres": "Fantasy"}).json()
+    assert client.post(f"/cinema/titles/media/{related['id']}/prediction").status_code == 200
+    assert prompts[1]["title_rating_feedback"] is None
+    assert prompts[1]["other_rating_feedback"] == [{**title, "score": 9.5}]
+
+
+def test_complete_chat_download_includes_older_messages_and_reference_data(client, monkeypatch):
+    from app.services.ai import LocalProvider
+
+    monkeypatch.setattr("app.main.current_provider", LocalProvider)
+    with SessionLocal() as db:
+        candidate = CatalogueItem(media_type="movie", title="Export example")
+        db.add(candidate)
+        db.flush()
+        db.add(RecommendationFeedback(catalogue_item_id=candidate.id, action="like"))
+        db.add(ResearchSource(catalogue_item_id=candidate.id, url="https://example.com/title"))
+        for index in range(105):
+            add_record(db, "chat", {"role": "user", "content": f"Full message {index}"})
+        db.commit()
+    assert client.post("/chat", json={"message": "Message from the AI page"}).status_code == 200
+    assert len(client.get("/local-chat").json()) == 100
+    archive = client.get("/data/export/json")
+    assert archive.headers["content-disposition"] == "attachment; filename=ManuAI_Complete_Data.json"
+    payload = archive.json()
+    records = payload["local_ai_records"]
+    assert len(records) == 107
+    assert records[0]["data"]["content"] == "Full message 0"
+    assert records[-2]["data"]["content"] == "Message from the AI page"
+    assert records[-1]["data"]["reply_to"] == records[-2]["id"]
+    assert payload["catalogue_items"][0]["title"] == "Export example"
+    assert payload["recommendation_feedback"][0]["action"] == "like"
+    assert payload["research_sources"][0]["url"] == "https://example.com/title"

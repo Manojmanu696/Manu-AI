@@ -7,6 +7,8 @@ export const statuses = {
 export type Status = keyof typeof statuses;
 export type Credit = { name: string; role: string };
 export type WatchProvider = { name: string; access: string; logo_url?: string };
+export type RatingFeedback = { score: number; title: string };
+
 export type Prediction = {
   score: number;
   explanation: string;
@@ -15,6 +17,7 @@ export type Prediction = {
   verdict: string;
   recommendation: string;
   model: string;
+  rating_feedback: RatingFeedback | null;
 };
 
 export type CutTitle = {
@@ -66,7 +69,7 @@ export type Review = {
   rating: number; verdict: string; body: string; tags: string; spoiler_notes: string; spoiler: boolean;
   finalized_at: string; updated_at: string;
 };
-export type TitleData = { title: CutTitle; checkpoints: Checkpoint[]; review: Review | null; metadata_notice: string; region: string };
+export type TitleData = { title: CutTitle; checkpoints: Checkpoint[]; review: Review | null; rating_feedback: RatingFeedback | null; metadata_notice: string; region: string };
 
 export const cutPath = (title: CutTitle) => `/title/${title.source}/${title.id}`;
 export const titleApi = (title: CutTitle) => `/cinema/titles/${title.source}/${title.id}`;

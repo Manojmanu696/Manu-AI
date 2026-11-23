@@ -19,6 +19,7 @@ from .services.personal_intelligence import build_profile
 from .services.portability import build_zip, csv_text, db_size, export_payload, restore_payload, serialize_media, serialize_memory
 from .services.recommendations import recommendations
 from .services.ollama import OllamaUnavailable
+from .services.local_ai_records import add_record
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
@@ -126,17 +127,29 @@ def research_search(payload:dict):
     except Exception as exc:raise HTTPException(502,f"Web search unavailable: {str(exc)[:220]}") from exc
 
 @app.post("/chat",response_model=ChatResponse)
-def chat(payload:ChatRequest,db:Session=Depends(get_db)):
-    message=payload.message.strip()
-    if not message:raise HTTPException(400,"message is required")
-    context=retrieve_context(db,message);provider=current_provider(db)
+def chat(payload: ChatRequest, db: Session = Depends(get_db)):
+    message = payload.message.strip()
+    if not message:
+        raise HTTPException(400, "message is required")
+    user = add_record(db, "assistant_chat", {"role": "user", "content": payload.message})
+    reply_to = user.id
+    db.commit()
+    context = retrieve_context(db, message)
+    provider = current_provider(db)
     try:
-        response=provider.respond(message,context)
-        if response.get("mode")=="ollama":response["mode"]="local";response["provider"]="ollama"
-        return response
+        response = provider.respond(message, context)
+        if response.get("mode") == "ollama":
+            response.update(mode="local", provider="ollama")
     except OllamaUnavailable as exc:
         from .services.ai import LocalProvider
-        fallback=LocalProvider(db).respond(message,context);fallback["mode"]="local-fallback";fallback["provider"]="recommendation-engine";fallback["assumptions"]=(fallback.get("assumptions") or [])+[f"Ollama unavailable: {str(exc)[:180]}"];return fallback
+        response = LocalProvider(db).respond(message, context)
+        response.update(mode="local-fallback", provider="recommendation-engine")
+        response["assumptions"] = (response.get("assumptions") or []) + [f"Ollama unavailable: {str(exc)[:180]}"]
+    add_record(db, "assistant_chat", {
+        "role": "assistant", "content": response["answer"], "reply_to": reply_to, "response": response,
+    })
+    db.commit()
+    return response
 
 @app.get("/data/summary")
 def data_summary(db:Session=Depends(get_db)):
@@ -145,7 +158,11 @@ def data_summary(db:Session=Depends(get_db)):
 
 @app.get("/data/export/json")
 def export_json(db:Session=Depends(get_db)):
-    content=json.dumps(export_payload(db),indent=2);return StreamingResponse(iter([content]),media_type="application/json",headers={"Content-Disposition":"attachment; filename=ManuAI_Data.json"})
+    content = json.dumps(export_payload(db), indent=2, ensure_ascii=False)
+    return StreamingResponse(iter([content]), media_type="application/json", headers={
+        "Content-Disposition": "attachment; filename=ManuAI_Complete_Data.json",
+        "Cache-Control": "no-store",
+    })
 
 @app.get("/data/export/csv")
 def export_csv(dataset:str=Query("media"),db:Session=Depends(get_db)):

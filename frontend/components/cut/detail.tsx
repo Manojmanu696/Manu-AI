@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
-import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, type Checkpoint, type CutTitle, type Prediction, type Review, type Status, type TitleData } from "@/lib/cut";
+import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, type Checkpoint, type CutTitle, type Prediction, type RatingFeedback, type Review, type Status, type TitleData } from "@/lib/cut";
 import { Artwork, CutFrame, Glyph, Shelf, StatePanel } from "./ui";
 import { CheckpointEditor, FinalReview, ReviewEditor, Timeline } from "./journal";
 import { catalogueProvider, ProviderTiles } from "./providers";
@@ -108,12 +108,28 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
   const titleLoaded = !!data;
 
   useEffect(() => {
+    function refreshPrediction(event: Event) {
+      const { detail } = event as CustomEvent<{ source: string; id: string; rating: RatingFeedback }>;
+      if (detail?.source === source && detail.id === id) {
+        setData(current => current && ({ ...current, rating_feedback: detail.rating }));
+      }
+      setPredictionAttempt(value => value + 1);
+    }
+    window.addEventListener("manu-taste-updated", refreshPrediction);
+    return () => window.removeEventListener("manu-taste-updated", refreshPrediction);
+  }, [source, id]);
+
+  useEffect(() => {
     if (!titleLoaded) return;
     const controller = new AbortController();
     setPrediction(undefined);
     setPredictionError("");
     api<Prediction>(`${endpoint}/prediction`, { method: "POST", signal: controller.signal })
-      .then(result => { if (!controller.signal.aborted) setPrediction(result); })
+      .then(result => {
+        if (controller.signal.aborted) return;
+        setPrediction(result);
+        setData(current => current && ({ ...current, rating_feedback: result.rating_feedback }));
+      })
       .catch(failure => { if (!controller.signal.aborted) setPredictionError(messageFrom(failure)); });
     return () => controller.abort();
   }, [endpoint, titleLoaded, predictionAttempt]);
@@ -205,10 +221,17 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
               <h2 id="cut-prediction-heading">AI recommendation</h2>
               {prediction && <p className="cut-muted">Local Ollama · {prediction.model}</p>}
             </div>
-            {prediction && <div className="cut-prediction-score"><span>Predicted rating</span><strong>{prediction.score.toFixed(1)}<small>/10</small></strong></div>}
+            {(data.rating_feedback || prediction) && <div className="cut-prediction-score">
+              <span>{data.rating_feedback ? "Your rating feedback" : "AI predicted rating"}</span>
+              <strong>{(data.rating_feedback?.score ?? prediction?.score)?.toFixed(1)}<small>/10</small></strong>
+            </div>}
           </div>
+          {data.rating_feedback && <p className="cut-muted">
+            Saved from your chat and used in future predictions.
+            {prediction && <> AI prediction with your latest profile · {prediction.score.toFixed(1)}/10</>}
+          </p>}
           {prediction ? <>
-            <div className="cut-prediction-summary"><h3>Why this rating?</h3><p>{prediction.explanation}</p></div>
+            <div className="cut-prediction-summary"><h3>Why this AI prediction?</h3><p>{prediction.explanation}</p></div>
             <div className="cut-prediction-points">
               <div><h3>What you might like</h3><ul>{prediction.what_you_might_like.map((point, index) => <li key={index}>{point}</li>)}</ul></div>
               <div><h3>What you might dislike</h3><ul>{prediction.what_you_might_dislike.map((point, index) => <li key={index}>{point}</li>)}</ul></div>

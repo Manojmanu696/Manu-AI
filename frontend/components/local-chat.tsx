@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { API_URL, api } from "@/lib/api";
+import type { RatingFeedback } from "@/lib/cut";
 import { Glyph } from "./cut/ui";
 import "./local-chat.css";
 
@@ -16,6 +17,7 @@ type ChatRecord = {
     model?: string;
     suggested_preference?: string | null;
     saved_preference?: string;
+    rating_feedback?: RatingFeedback | null;
   };
 };
 type ChatReply = { user: ChatRecord; assistant: ChatRecord | null; error: string | null };
@@ -101,6 +103,11 @@ export function LocalChat() {
       });
       const latest = [response.user, ...(response.assistant ? [response.assistant] : [])];
       setRecords(current => [...current.filter(row => !latest.some(entry => entry.id === row.id)), ...latest]);
+      if (title && response.user.data.rating_feedback) {
+        window.dispatchEvent(new CustomEvent("manu-taste-updated", {
+          detail: { source: title[1], id: title[2], rating: response.user.data.rating_feedback },
+        }));
+      }
       setMessage("");
       if (response.error) setError(response.error);
     } catch (failure) {
@@ -122,7 +129,7 @@ export function LocalChat() {
       </header>
       <div className="local-chat-links">
         <Link href="/profile" onClick={close}>Taste profile</Link>
-        <a href={`${API_URL}/data/export/zip`}>Download my data</a>
+        <a href={`${API_URL}/data/export/json`}>Download all AI data (JSON)</a>
       </div>
       <div ref={log} className="local-chat-log" role="log" aria-label="Recent chat history" aria-live="polite">
         {loading && <p>Loading your conversations…</p>}
@@ -131,7 +138,14 @@ export function LocalChat() {
           <div className="local-chat-author"><strong>{entry.data.role === "user" ? "You" : entry.data.model || "Manu"}</strong>
             <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></div>
           <p>{entry.data.content}</p>
-          <Preference entry={entry} onSaved={changed => setRecords(current => current.map(row => row.id === changed.id ? changed : row))}/>
+          {entry.data.rating_feedback && <p className="local-chat-saved">
+            <strong>Rating feedback saved</strong><br/>
+            {entry.data.rating_feedback.title} · {entry.data.rating_feedback.score.toFixed(1)}/10
+          </p>}
+          <Preference entry={entry} onSaved={changed => {
+            setRecords(current => current.map(row => row.id === changed.id ? changed : row));
+            window.dispatchEvent(new CustomEvent("manu-taste-updated"));
+          }}/>
         </div>)}
         {sending && <p role="status">Ollama is thinking…</p>}
         {error && <p className="local-chat-error" role="alert">{error}</p>}

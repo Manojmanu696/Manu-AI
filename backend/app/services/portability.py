@@ -5,10 +5,12 @@ import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
 from uuid import UUID
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
-from ..models import FilmReview, LocalAIRecord, MediaItem, Memory, ViewingCheckpoint
+from ..models import CatalogueItem, FilmReview, LocalAIRecord, MediaItem, Memory, RecommendationFeedback, ResearchSource, ViewingCheckpoint
 from ..config import BACKUP_DIR, DATA_DIR
 from .local_ai_records import serialize_record
+from .rating_feedback import record_feedback
 
 PORTABLE_VERSION = "1.0"
 
@@ -32,16 +34,19 @@ def serialize_memory(memory: Memory):
 
 
 def export_payload(db: Session):
+    records = db.query(LocalAIRecord).order_by(LocalAIRecord.created_at, LocalAIRecord.id).all()
     return {
         "format": "manu-ai-portable-data", "version": PORTABLE_VERSION,
         "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "media_items": [serialize_media(item) for item in db.query(MediaItem).all()],
         "memories": [serialize_memory(memory) for memory in db.query(Memory).all()],
-        "local_ai_records": [
-            serialize_record(record) for record in db.query(LocalAIRecord).order_by(LocalAIRecord.created_at, LocalAIRecord.id)
+        "local_ai_records": [serialize_record(record) for record in records],
+        "rating_feedback_history": [
+            {"chat_id": record.id, "created_at": serialize_record(record)["created_at"], **rating}
+            for record in records if (rating := record_feedback(record))
         ],
         "viewing_checkpoints": [
-            {"media_item_id": row.media_item_id, "viewing_date": row.viewing_date.isoformat(), **row.details}
+            {**row.details, "id": row.id, "media_item_id": row.media_item_id, "viewing_date": row.viewing_date.isoformat()}
             for row in db.query(ViewingCheckpoint).order_by(ViewingCheckpoint.viewing_date, ViewingCheckpoint.id)
         ],
         "film_reviews": [
@@ -49,6 +54,9 @@ def export_payload(db: Session):
              "updated_at": row.updated_at.isoformat(), **row.details}
             for row in db.query(FilmReview)
         ],
+        "catalogue_items": jsonable_encoder(db.query(CatalogueItem).order_by(CatalogueItem.id).all()),
+        "recommendation_feedback": jsonable_encoder(db.query(RecommendationFeedback).order_by(RecommendationFeedback.id).all()),
+        "research_sources": jsonable_encoder(db.query(ResearchSource).order_by(ResearchSource.id).all()),
     }
 
 
@@ -95,9 +103,9 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
             timestamp = _parse_date(record["created_at"])
             kind = record["kind"]
             data = record["data"]
-            if timestamp is None or kind not in {"chat", "prediction", "preference"} or not isinstance(data, dict):
+            if timestamp is None or kind not in {"chat", "assistant_chat", "prediction", "preference"} or not isinstance(data, dict):
                 raise ValueError()
-            if kind == "chat" and (data.get("role") not in {"user", "assistant"} or not isinstance(data.get("content"), str)):
+            if kind in {"chat", "assistant_chat"} and (data.get("role") not in {"user", "assistant"} or not isinstance(data.get("content"), str)):
                 raise ValueError()
         except (ValueError, KeyError, TypeError, AttributeError) as exc:
             raise ValueError("Invalid local AI record in this backup.") from exc
@@ -118,7 +126,7 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
     for raw in payload.get("viewing_checkpoints", []):
         item = id_map.get(raw["media_item_id"])
         if item is not None:
-            details = {key: value for key, value in raw.items() if key not in {"media_item_id", "viewing_date"}}
+            details = {key: value for key, value in raw.items() if key not in {"id", "media_item_id", "viewing_date"}}
             db.add(ViewingCheckpoint(media_item_id=item.id, viewing_date=date.fromisoformat(raw["viewing_date"]), details=details))
     for raw in payload.get("film_reviews", []):
         item = id_map.get(raw["media_item_id"])
