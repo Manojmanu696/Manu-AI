@@ -3,10 +3,14 @@
   color: #f4f1ef;
   --bg: #121212;
   --panel: #1c1b1b;
+  --panel-2: #272525;
+  --text: #f4f1ef;
+  --border: #494343;
   --purple: #df534a;
   --purple-light: #ff9c92;
-  --muted: #aaa4a2;
+  --muted: #b9b1af;
   --line: #ffffff16;
+  color-scheme: dark;
 }
 
 .cinema-shell .sidebar {
@@ -17,6 +21,8 @@
 }
 .cinema-shell .brand { color: #f4f1ef; }
 .cinema-shell .nav-item { color: #b4adac; }
+.cinema-shell .nav-item:hover { background: var(--panel-2); color: var(--text); }
+.cinema-shell .nav-item::after { display: none; }
 .cinema-shell a.nav-item { text-decoration: none; }
 .cinema-shell .brand-mark { background: #a92b24; color: white; box-shadow: none; }
 .cinema-shell .nav-item.active {
@@ -25,6 +31,69 @@
   box-shadow: inset 3px 0 #d4473e;
 }
 .cinema-shell .main { min-width: 0; }
+.cinema-shell .sidebar-bottom,
+.cinema-shell .topbar {
+  background: var(--bg);
+  color: var(--muted);
+  border-color: var(--line);
+  box-shadow: none;
+}
+.cinema-shell .crumb,
+.cinema-shell .crumb span { color: var(--muted); }
+.cinema-shell .topbar .avatar {
+  background: #a92b24;
+  color: #fff;
+  box-shadow: none;
+}
+.cinema-shell :is(.page-intro h1, .library-head h1, .library-empty h2, .card-copy h3, .memory-card p, .data-overview b) {
+  color: var(--text);
+}
+.cinema-shell :is(.caption, .library-empty, .subhead, .page-intro > p:not(.eyebrow), .library-head > div > p:last-child,
+  .card-copy > p:not(.reason), .card-meta, .data-overview span, .data-overview small, .setting-row p) {
+  color: var(--muted);
+}
+.cinema-shell :is(.eyebrow, .memory-card span, .ai-label, .rating) { color: var(--purple-light); }
+.cinema-shell :is(.panel, .media-card, .memory-card, .chat-shell, .ai-answer, .search-field) {
+  background: var(--panel);
+  border-color: var(--border);
+  box-shadow: none;
+}
+.cinema-shell .data-overview > div { border-color: var(--border); }
+.cinema-shell :is(.search-field, .chat-input) :is(input, textarea) {
+  color: var(--text);
+  caret-color: currentColor;
+}
+.cinema-shell .memory-add :is(input, select) {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--border);
+}
+.cinema-shell :is(.search-field input, .chat-input textarea, .memory-add input)::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+.cinema-shell :is(.chat-input, .search-field):focus-within,
+.cinema-shell .memory-add input:focus-visible {
+  outline: 2px solid var(--purple-light);
+  outline-offset: 2px;
+}
+.cinema-shell .primary-button {
+  background: #a92b24;
+  color: #fff;
+  box-shadow: none;
+}
+.cinema-shell .primary-button:hover { background: #bc352b; }
+.cinema-shell .primary-button:disabled {
+  background: var(--panel-2);
+  color: var(--muted);
+  opacity: 1;
+}
+.cinema-shell .secondary-button {
+  background: var(--panel-2);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: none;
+}
 .cinema-shell .search-experience.cinema-search {
   position: relative;
   inset: auto;
