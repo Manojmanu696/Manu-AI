@@ -7,9 +7,10 @@ import "./google-home.css";
 import "./manu-modern.css";
 import "../components/cinema-home.css";
 import "./cut.css";
+import { LocalChat } from "@/components/local-chat";
 
 export const metadata: Metadata = { title: "Manu’s Cut", description: "Discover films, series and anime, and keep a personal viewing journal." };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en"><body>{children}</body></html>;
+  return <html lang="en"><body>{children}<LocalChat/></body></html>;
 }

@@ -371,6 +371,7 @@
 .cut-prediction-points li { color: var(--cut-muted); }
 .cut-prediction-points li::marker { color: var(--cut-accent); }
 .cut-prediction-verdict { padding-left: 12px; border-left: 2px solid var(--cut-accent); }
+.cut-refresh-prediction { margin-top: 13px; }
 @media (max-width: 600px) {
   .cut-prediction-points { grid-template-columns: 1fr; }
   .cut-prediction-score { padding-inline: 8px; }

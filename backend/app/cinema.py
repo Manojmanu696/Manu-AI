@@ -13,6 +13,7 @@ from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, 
 from .services import ollama, tvmaze, title_prediction
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, identity, search_tmdb
 from .services.discovery import _public_score, score_catalogue_item
+from .services.local_ai_records import add_record
 
 router = APIRouter(prefix="/cinema", tags=["cinema"])
 
@@ -267,11 +268,14 @@ def predict_title(source: str, item_id: int, db: Session = Depends(get_db)):
     messages = title_prediction.prediction_prompt(db, title)
     db.rollback()
     try:
-        return title_prediction.predict(messages)
+        prediction = title_prediction.predict(messages)
     except ollama.OllamaUnavailable as exc:
         raise HTTPException(503, "Local Ollama is unavailable. Start it and retry the prediction.") from exc
     except (ValidationError, KeyError, TypeError) as exc:
         raise HTTPException(502, "Ollama did not return a valid prediction. Please retry.") from exc
+    add_record(db, "prediction", {"title": title, "prediction": prediction})
+    db.commit()
+    return prediction
 
 
 def mutation_target(db, source, item_id, new_status):

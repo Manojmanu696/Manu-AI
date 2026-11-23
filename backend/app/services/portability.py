@@ -4,9 +4,11 @@ import json
 import zipfile
 from datetime import date, datetime, timezone
 from pathlib import Path
+from uuid import UUID
 from sqlalchemy.orm import Session
-from ..models import FilmReview, MediaItem, Memory, ViewingCheckpoint
+from ..models import FilmReview, LocalAIRecord, MediaItem, Memory, ViewingCheckpoint
 from ..config import BACKUP_DIR, DATA_DIR
+from .local_ai_records import serialize_record
 
 PORTABLE_VERSION = "1.0"
 
@@ -35,6 +37,9 @@ def export_payload(db: Session):
         "exported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "media_items": [serialize_media(item) for item in db.query(MediaItem).all()],
         "memories": [serialize_memory(memory) for memory in db.query(Memory).all()],
+        "local_ai_records": [
+            serialize_record(record) for record in db.query(LocalAIRecord).order_by(LocalAIRecord.created_at, LocalAIRecord.id)
+        ],
         "viewing_checkpoints": [
             {"media_item_id": row.media_item_id, "viewing_date": row.viewing_date.isoformat(), **row.details}
             for row in db.query(ViewingCheckpoint).order_by(ViewingCheckpoint.viewing_date, ViewingCheckpoint.id)
@@ -67,6 +72,7 @@ def build_zip(db: Session) -> Path:
         archive.writestr("memories.csv", csv_text(payload["memories"]))
         archive.writestr("viewing-checkpoints.csv", csv_text(payload["viewing_checkpoints"]))
         archive.writestr("film-reviews.csv", csv_text(payload["film_reviews"]))
+        archive.writestr("local-ai-history.json", json.dumps(payload["local_ai_records"], indent=2, ensure_ascii=False))
         archive.writestr("README.txt", "Manu AI portable backup v1.0. Import this ZIP with Manu AI's Data page.\n")
     return path
 
@@ -81,6 +87,23 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
     if replace:
         db.query(MediaItem).delete()
         db.query(Memory).delete()
+        db.query(LocalAIRecord).delete()
+    ai_ids = {value for (value,) in db.query(LocalAIRecord.id)}
+    for record in payload.get("local_ai_records", []):
+        try:
+            record_id = str(UUID(record["id"]))
+            timestamp = _parse_date(record["created_at"])
+            kind = record["kind"]
+            data = record["data"]
+            if timestamp is None or kind not in {"chat", "prediction", "preference"} or not isinstance(data, dict):
+                raise ValueError()
+            if kind == "chat" and (data.get("role") not in {"user", "assistant"} or not isinstance(data.get("content"), str)):
+                raise ValueError()
+        except (ValueError, KeyError, TypeError, AttributeError) as exc:
+            raise ValueError("Invalid local AI record in this backup.") from exc
+        if record_id not in ai_ids:
+            db.add(LocalAIRecord(id=record_id, kind=kind, created_at=timestamp, data=data))
+            ai_ids.add(record_id)
     id_map = {}
     for raw in payload.get("media_items", []):
         values = {key: raw.get(key) for key in ("media_type","title","description","genres","personal_rating","sentiment","status","notes","tags","runtime","release_year","external_id","external_url","image_url","ai_metadata","is_demo")}

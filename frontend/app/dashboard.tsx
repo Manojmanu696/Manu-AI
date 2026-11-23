@@ -4,7 +4,7 @@ import { CutBrowse } from "@/components/cut/browse";
 import CinemaHome from "@/components/cinema-home";
 import { Sidebar } from "@/components/sidebar";
 import { MediaCard } from "@/components/media-card";
-import { api, MediaItem, Memory, Recommendation } from "@/lib/api";
+import { api, API_URL, MediaItem, Memory, Recommendation } from "@/lib/api";
 
 const labels: Record<string, string> = {
   game: "Games", book: "Books", memory: "Memory", data: "Data", ai: "AI", settings: "Settings",
@@ -26,7 +26,24 @@ function Library({label,items}:{label:string;items:MediaItem[]}){const[q,setQ]=u
 
 function MemoryPage({memories,refresh}:{memories:Memory[];refresh:()=>void}){const[text,setText]=useState("");const[category,setCategory]=useState("favorite genres");async function add(e:React.FormEvent){e.preventDefault();if(!text.trim())return;await api("/memories",{method:"POST",body:JSON.stringify({category,content:text,source:"user"})});setText("");refresh()}return <div className="content"><section className="page-intro narrow"><p className="eyebrow">MEMORY</p><h1>Your taste profile.</h1><p>Preferences here influence personalized ranking.</p></section><section className="panel memory-add"><form onSubmit={add}><select value={category} onChange={e=>setCategory(e.target.value)}><option>favorite genres</option><option>disliked genres</option><option>preferred pacing</option><option>preferred runtime</option><option>favorite themes</option><option>things to avoid</option></select><input value={text} onChange={e=>setText(e.target.value)} placeholder="Add a preference…"/><button className="primary-button">Save</button></form></section><div className="memory-cards">{memories.map(m=><article className="memory-card" key={m.id}><div><span>{m.category}</span><p>{m.content}</p></div><button className="danger-button" onClick={async()=>{await api(`/memories/${m.id}`,{method:"DELETE"});refresh()}}>Delete</button></article>)}</div></div>}
 
-function DataPage({summary}:{summary:Summary|null}){const total=summary?Object.values(summary.counts).reduce((a,b)=>a+b,0):0;return <div className="content"><section className="page-intro narrow"><p className="eyebrow">DATA</p><h1>Your data.</h1><p>Your library and memory remain local to this application.</p></section><div className="data-overview panel"><div><span>Stories</span><b>{total}</b></div><div><span>Memories</span><b>{summary?.memories||0}</b></div><div><span>Database</span><b>{summary?`${Math.round(summary.database_bytes/1024)} KB`:"—"}</b></div></div></div>}
+function DataPage({ summary }: { summary: Summary | null }) {
+  const total = summary ? Object.values(summary.counts).reduce((sum, count) => sum + count, 0) : 0;
+  return <div className="content">
+    <section className="page-intro narrow">
+      <p className="eyebrow">DATA</p><h1>Your data.</h1>
+      <p>Download your local chat history, approved preferences, saved predictions, and viewing journal.</p>
+      <div className="actions">
+        <a className="primary-button" href={`${API_URL}/data/export/zip`}>Download full backup</a>
+        {" "}<a className="secondary-button" href={`${API_URL}/data/export/json`}>Download JSON</a>
+      </div>
+    </section>
+    <div className="data-overview panel">
+      <div><span>Stories</span><b>{total}</b></div>
+      <div><span>Memories</span><b>{summary?.memories || 0}</b></div>
+      <div><span>Database</span><b>{summary ? `${Math.round(summary.database_bytes / 1024)} KB` : "—"}</b></div>
+    </div>
+  </div>;
+}
 
 function AIPage(){const[q,setQ]=useState("");const[answer,setAnswer]=useState("");const[busy,setBusy]=useState(false);async function ask(e:React.FormEvent){e.preventDefault();if(!q.trim())return;setBusy(true);try{const r=await api<{answer?:string}>("/chat",{method:"POST",body:JSON.stringify({message:q})});setAnswer(r.answer||"")}catch{}finally{setBusy(false)}}return <div className="content ai-page"><section className="page-intro narrow"><p className="eyebrow">MANU AI</p><h1>Ask anything.</h1><p>Dedicated assistant mode. Normal web and media search stays on Home.</p></section><div className="chat-shell">{answer&&<article className="ai-answer"><span className="ai-label">MANU AI</span><p>{answer}</p></article>}<form className="chat-input" onSubmit={ask}><textarea value={q} onChange={e=>setQ(e.target.value)} placeholder="Ask Manu AI…" rows={3}/><button className="primary-button" disabled={busy}>{busy?"Thinking…":"Ask Manu →"}</button></form></div></div>}
 

@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 from .cinema import router as cinema_router
+from .local_chat import router as local_chat_router
 from .config import ALLOWED_ORIGINS, BACKUP_DIR
 from .database import Base, engine, get_db
 from .demo import load_demo
@@ -166,3 +167,4 @@ async def import_backup(file:UploadFile=File(...),replace:bool=Query(False),db:S
     return {"restored":True,"media_items":len(payload.get("media_items",[])),"memories":len(payload.get("memories",[])),"replace":replace}
 
 app.include_router(cinema_router)
+app.include_router(local_chat_router)

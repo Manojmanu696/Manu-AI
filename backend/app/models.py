@@ -106,3 +106,11 @@ class FilmReview(Base):
     finalized_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     details: Mapped[dict] = mapped_column(JSON)
+
+
+class LocalAIRecord(Base):
+    __tablename__ = "local_ai_records"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    kind: Mapped[str] = mapped_column(String(24), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    data: Mapped[dict] = mapped_column(JSON)

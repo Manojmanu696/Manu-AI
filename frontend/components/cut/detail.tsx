@@ -214,6 +214,9 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
               <div><h3>What you might dislike</h3><ul>{prediction.what_you_might_dislike.map((point, index) => <li key={index}>{point}</li>)}</ul></div>
             </div>
             <div className="cut-prediction-verdict"><h3>{prediction.verdict}</h3><p>{prediction.recommendation}</p></div>
+            <button className="cut-text-button cut-refresh-prediction" onClick={() => setPredictionAttempt(value => value + 1)}>
+              Recalculate with my latest profile
+            </button>
           </> : predictionError ? <>
             <p role="alert">{predictionError}</p>
             <button className="cut-btn cut-secondary" onClick={() => setPredictionAttempt(value => value + 1)}>Retry AI prediction</button>
