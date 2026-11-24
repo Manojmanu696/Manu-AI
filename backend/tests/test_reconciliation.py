@@ -4,6 +4,7 @@ from app.services.evidence import change_status
 from app.services.local_ai_records import add_record
 from app.services.rating_feedback import extract_rating_feedback, latest_feedback
 from app.services.recommendations import score_title, taste
+from app.services.watch_listings import title_listings
 
 
 def test_unknown_completion_date_stays_unknown_after_export_and_repeat_update(client):
@@ -104,8 +105,8 @@ def test_india_anime_provider_fallback_requires_exact_identity(monkeypatch):
     monkeypatch.setattr(watch_listings, "read_title", lambda *args: {})
     anime = {"title": "Link Click: Bridon Arc", "media_type": "anime",
              "release_year": 2024, "external_id": "anilist:anime:170166"}
-    listing = watch_listings.title_listings(anime, "IN")
+    listing = title_listings(anime, "IN")
     assert listing["provider_source"] == "Crunchyroll"
     assert listing["audio_languages"] == ["en"]
-    assert watch_listings.title_listings(anime, "US") == {}
-    assert watch_listings.title_listings({**anime, "external_id": ""}, "IN") == {}
+    assert title_listings(anime, "US") == {}
+    assert title_listings({**anime, "external_id": ""}, "IN") == {}
