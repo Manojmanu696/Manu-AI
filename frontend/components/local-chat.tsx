@@ -20,6 +20,7 @@ type ChatRecord = {
     rating_feedback?: RatingFeedback | null;
     title?: { title?: string };
     superseded?: boolean;
+    rating_feedback_withdrawn?: { reason: string };
   };
 };
 type ChatReply = { user: ChatRecord; assistant: ChatRecord | null; error: string | null };
@@ -151,10 +152,11 @@ export function LocalChat() {
           <div className="local-chat-author"><strong>{entry.data.role === "user" ? "You" : entry.data.model || "Manu"}</strong>
             <time dateTime={entry.created_at}>{new Date(entry.created_at).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" })}</time></div>
           {entry.data.superseded ? <details>
-            <summary>Earlier reply · See the saved rating above</summary>
+            <summary>Earlier model reply</summary>
             <p>{entry.data.content}</p>
           </details> : <p>{entry.data.content}</p>}
           {entry.data.title?.title && <small>{entry.data.title.title}</small>}
+          {entry.data.rating_feedback_withdrawn && <p className="local-chat-saved">Rating attribution withdrawn. {entry.data.rating_feedback_withdrawn.reason}</p>}
           {entry.data.rating_feedback && <p className="local-chat-saved">
             <strong>Rating feedback saved</strong><br/>
             {entry.data.rating_feedback.title} · {entry.data.rating_feedback.score.toFixed(1)}/10

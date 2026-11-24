@@ -21,12 +21,17 @@ def words(value):
     return set(re.findall(r"[^\W_]+", value.casefold()))
 
 
+def genres_for(value):
+    aliases = {"science-fiction": "science fiction", "sci-fi": "science fiction"}
+    return {aliases.get(genre, genre) for genre in terms((value or "").replace(" & ", ", "))} - {"drama"}
+
+
 def taste(db):
     history = personal_media(db).all()
     liked = [row for row in history if (row.personal_rating or 0) >= 8 or row.sentiment == "like"]
     evidence = defaultdict(list)
     for row in liked:
-        for genre in terms(row.genres):
+        for genre in genres_for(row.genres):
             evidence[genre].append(row.title)
     tags = Counter(tag for row in liked for tag in terms(row.tags))
     memories = [row for row in taste_memories(db) if row.source in EXPLICIT_SOURCES]
@@ -36,7 +41,7 @@ def taste(db):
 
 
 def score_title(candidate, evidence, feedback=None):
-    genres = terms(field(candidate, "genres"))
+    genres = genres_for(field(candidate, "genres"))
     tags = terms(field(candidate, "tags"))
     description = field(candidate, "description") or ""
     narrative = words(" ".join((description, " ".join(tags))))
@@ -114,15 +119,15 @@ def recommend_order(results, limit, diversify=False):
         return []
     chosen = [ranked.pop(0)]
     seen_types = Counter([field(chosen[0]["item"], "media_type")])
-    seen_genres = Counter(terms(field(chosen[0]["item"], "genres")))
+    seen_genres = Counter(genres_for(field(chosen[0]["item"], "genres")))
     while ranked and len(chosen) < limit:
         candidate = max(ranked, key=lambda row: row["score"] - (
-            min(10, 4 * seen_types[field(row["item"], "media_type")]) +
-            min(8, sum(seen_genres[g] for g in terms(field(row["item"], "genres")))) if diversify else 0))
+            min(18, 9 * seen_types[field(row["item"], "media_type")]) +
+            min(15, 4 * sum(seen_genres[g] for g in genres_for(field(row["item"], "genres")))) if diversify else 0))
         ranked.remove(candidate)
         chosen.append(candidate)
         seen_types[field(candidate["item"], "media_type")] += 1
-        seen_genres.update(terms(field(candidate["item"], "genres")))
+        seen_genres.update(genres_for(field(candidate["item"], "genres")))
     for index, result in enumerate(chosen):
         item = result["item"]
         plot = field(item, "description") or ""

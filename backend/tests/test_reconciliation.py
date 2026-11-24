@@ -80,3 +80,21 @@ def test_seen_recommendations_rotate_without_personal_history_mutation(client, m
     assert len(first) == len(second) == 3
     assert {row["title"] for row in first}.isdisjoint(row["title"] for row in second)
     assert client.get("/media").json() == []
+
+
+def test_fresh_recommendations_hold_unconfirmed_sequels_and_ambiguous_history():
+    from app.models import CatalogueItem, RecommendationFeedback
+    from app.services.discovery import discover
+
+    with SessionLocal() as db:
+        db.add_all([
+            CatalogueItem(id=1, title="Example Season 3", media_type="anime"),
+            CatalogueItem(id=2, title="Ambiguous special", media_type="anime"),
+            CatalogueItem(id=3, title="Fresh", media_type="anime"),
+            MediaItem(title="Example", media_type="anime", status="completed"),
+        ])
+        db.flush()
+        db.add(RecommendationFeedback(catalogue_item_id=2, action="completed"))
+        db.commit()
+        assert [row["item"].title for row in discover(db)] == ["Fresh"]
+        assert [row["item"].title for row in discover(db, query="Ambiguous")] == ["Ambiguous special"]

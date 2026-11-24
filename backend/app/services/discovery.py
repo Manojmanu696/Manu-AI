@@ -133,7 +133,9 @@ def discover(db: Session, media_type=None, limit=24, query=None, language=None, 
     catalogue = q.all()
     history = personal_media(db).all()
     feedback = feedback_by_title(db)
-    hidden = [item for item in catalogue if feedback.get(item.id) in {"watched", "not_for_me"}]
+    # Legacy completion entries can be inconsistent. Hold those titles out of the
+    # fresh shortlist while keeping the underlying viewing status and history intact.
+    hidden = [item for item in catalogue if feedback.get(item.id) in {"watched", "not_for_me", "completed"}]
     excluded = [item for item in history if item.status in FRESH_EXCLUSIONS or item.sentiment == "dislike" or item.personal_rating is not None] + hidden
     evidence = taste(db)
     tokens = _tokens(query)
@@ -152,6 +154,16 @@ def discover(db: Session, media_type=None, limit=24, query=None, language=None, 
             continue
         if not query and any(item is other or same_work(item, other) for other in excluded):
             continue
+        if not query and (sequel := re.search(r"\s+(season|part)\s+([2-9]|\d{2,})$|\s+specials?$",
+                                             item["title"] if isinstance(item, dict) else item.title, re.I)):
+            title = item["title"] if isinstance(item, dict) else item.title
+            media_kind = item["media_type"] if isinstance(item, dict) else item.media_type
+            predecessor = title[:sequel.start()].casefold()
+            if sequel[2] and int(sequel[2]) > 2:
+                predecessor += f" {sequel[1].lower()} {int(sequel[2]) - 1}"
+            if not any(own.status == "completed" and own.media_type == media_kind
+                       and own.title.casefold() == predecessor for own in history):
+                continue
         if not meets_constraints(item, language, max_minutes):
             if not budget or (item["media_type"] if isinstance(item, dict) else item.media_type) not in public_types:
                 continue

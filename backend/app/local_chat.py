@@ -72,7 +72,7 @@ def history(db: Session = Depends(get_db)):
             entry["data"] = {**entry["data"], "rating_feedback": rating}
         if row.data.get("model") and (parent := original.get(row.data.get("reply_to"))):
             entry["data"] = {**entry["data"], "title": parent.data.get("title")}
-            if record_feedback(parent):
+            if record_feedback(parent) or parent.data.get("rating_feedback_withdrawn"):
                 entry["data"]["superseded"] = True
         entries.append(entry)
     return entries

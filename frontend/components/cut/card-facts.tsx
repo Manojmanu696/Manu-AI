@@ -101,7 +101,7 @@ export function CardFacts({ title, prediction, feedback, pending, unavailable }:
     {title.verdict && <section className="cut-card-reason">
       <strong>{title.verdict}</strong>
       {title.description && <p>{title.description}</p>}
-      {title.reasons?.[0] && <p>{title.reasons[0]}</p>}
+      {title.reasons?.slice(0, 2).map(reason => <p key={reason}>{reason}</p>)}
       {title.caveat && <small>{title.caveat}</small>}
       {title.source === "catalogue" && <div>
         <button type="button" className="cut-text-button" onClick={dismiss}>Not for me</button>
