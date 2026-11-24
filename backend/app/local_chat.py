@@ -10,6 +10,7 @@ from .database import get_db
 from .models import LocalAIRecord, MediaItem, Memory
 from .services import ollama
 from .services.local_ai_records import add_record, serialize_record
+from .services.evidence import save_memory, taste_memories
 from .services.rating_feedback import extract_rating_feedback, latest_feedback, record_feedback, title_key
 
 router = APIRouter(prefix="/local-chat", tags=["local-chat"])
@@ -92,7 +93,7 @@ def send(payload: ChatInput, db: Session = Depends(get_db)):
     previous.reverse()
     preferences = [
         {"category": row.category, "content": row.content[:500], "source": row.source}
-        for row in db.query(Memory).filter_by(is_demo=False).order_by(Memory.created_at.desc()).limit(24)
+        for row in taste_memories(db)[:24]
     ]
     recent_ratings = [
         {"title": row.title, "rating": row.personal_rating, "genres": row.genres}
@@ -161,7 +162,7 @@ def remember(record_id: str, payload: PreferenceInput, db: Session = Depends(get
     if not row or row.kind != "chat" or row.data.get("role") != "assistant" or not row.data.get("suggested_preference"):
         raise HTTPException(404, "Preference suggestion not found.")
     if not row.data.get("saved_preference"):
-        db.add(Memory(category="media_taste", content=payload.content, source="user", confidence=1.0))
+        save_memory(db, {"category": "media_taste", "content": payload.content, "source": "approved"})
         row.data = {**row.data, "saved_preference": payload.content}
         add_record(db, "preference", {"content": payload.content, "chat_id": row.id})
     db.flush()

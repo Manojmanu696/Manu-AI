@@ -241,7 +241,7 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
       {error ? <StatePanel title="Couldn’t open this title" error><p>{error}</p><div className="cut-actions"><button className="cut-btn cut-secondary" onClick={() => setRetry(value => value + 1)}>Retry</button><Link href="/browse/discover" className="cut-btn cut-primary">Discover titles</Link></div></StatePanel>
       : <div role="status" aria-busy="true"><div className="cut-loading"/><p>Opening title…</p></div>}
     </div> : <>
-      <TitleIntro title={data.title} status={data.title.status || "recommended"} reviewed={!!data.review} busy={busy || pendingRegion} setStatus={changeStatus} open={setEditor}/>
+      <TitleIntro title={data.title} status={data.title.status || "unknown"} reviewed={!!data.review} busy={busy || pendingRegion} setStatus={changeStatus} open={setEditor}/>
       <nav className="cut-jumps" aria-label="On this page"><div className="cut-container">{sections.map(([target, label]) => <a key={target} href={`#${target}`}>{label}</a>)}</div></nav>
       <div className="cut-container">
         <section className="cut-detail-section cut-recommendation cut-prediction" id="prediction" aria-labelledby="cut-prediction-heading">
@@ -273,6 +273,13 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
             <p role="alert">{predictionError}</p>
             <button className="cut-btn cut-secondary" onClick={() => setPredictionAttempt(value => value + 1)}>Retry AI prediction</button>
           </> : <p role="status">Ollama is estimating your rating from your taste profile…</p>}
+          {!!data.rating_history?.length && <details className="cut-rating-feedback">
+            <summary>Rating history</summary>
+            <ul>{data.rating_history.map((entry, index) => <li key={index}>
+              {entry.range ? `≈ ${entry.range.join("–")}/${entry.scale}` : entry.score == null ? "Unrated" : `${entry.score}/${entry.scale}`}
+              {" · "}{entry.source.replaceAll("_", " ")}{" · "}{new Date(entry.recorded_at).toLocaleDateString()}
+            </li>)}</ul>
+          </details>}
           <RatingForm title={data.title} feedback={data.rating_feedback} onSaved={rating => {
             window.dispatchEvent(new CustomEvent("manu-taste-updated", { detail: { source, id, rating } }));
           }}/>

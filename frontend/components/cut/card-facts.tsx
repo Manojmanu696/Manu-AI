@@ -80,17 +80,40 @@ export function useTitleCard(title: CutTitle) {
     return () => controller.abort();
   }, [endpoint, card, unavailable]);
 
-  return { ref, title: card?.title ?? title, feedback: card?.rating_feedback, prediction: card?.prediction,
+  return { ref, title: card ? { ...title, ...card.title } : title, feedback: card?.rating_feedback, prediction: card?.prediction,
     pending: started && !unavailable && !card?.prediction, unavailable };
 }
 
 export function CardFacts({ title, prediction, feedback, pending, unavailable }: Omit<ReturnType<typeof useTitleCard>, "ref">) {
+  const [feedbackStatus, setFeedbackStatus] = useState("");
+  async function dismiss() {
+    try {
+      await api(`/discover/${title.id}/feedback`, { method: "POST", body: JSON.stringify({ action: "not_for_me" }) });
+      window.dispatchEvent(new CustomEvent("manu-library-updated"));
+      setFeedbackStatus("Hidden from fresh recommendations.");
+    } catch {
+      setFeedbackStatus("Could not save feedback.");
+    }
+  }
   const series = title.media_type !== "movie";
   const providers = title.providers?.length ? title.providers : !title.provider_data_available ? catalogueProviders(title) : [];
   return <div className="cut-card-facts">
+    {title.verdict && <section className="cut-card-reason">
+      <strong>{title.verdict}</strong>
+      {title.description && <p>{title.description}</p>}
+      {title.reasons?.[0] && <p>{title.reasons[0]}</p>}
+      {title.caveat && <small>{title.caveat}</small>}
+      {title.source === "catalogue" && <div>
+        <button type="button" className="cut-text-button" onClick={dismiss}>Not for me</button>
+        {feedbackStatus && <p role="status">{feedbackStatus}</p>}
+      </div>}
+    </section>}
     <dl>
       <div><dt>{series ? "Total watch time" : "Runtime"}</dt><dd>{totalWatchTime(title) || "—"}</dd></div>
       {series && <div><dt>Seasons · Episodes</dt><dd>{title.seasons ?? "—"} · {title.episodes ?? "—"}</dd></div>}
+      {title.verdict && <div><dt>Personal fit</dt><dd title="Heuristic ranking signal">{title.score ?? "Unverified"}</dd></div>}
+      {title.verdict && title.media_type === "anime" && <div><dt>English audio</dt><dd>{title.audio_languages?.includes("en") ? "Listed in India" : "Unverified"}</dd></div>}
+      {title.intensity && <div><dt>Intensity</dt><dd>{title.intensity}</dd></div>}
       <div><dt>AI prediction</dt><dd title={prediction?.model}>
         {prediction ? `${prediction.score.toFixed(1)}/10` : unavailable ? "Unavailable" : pending ? "Pending…" : "—"}
       </dd></div>

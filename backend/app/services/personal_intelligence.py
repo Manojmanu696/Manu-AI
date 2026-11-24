@@ -1,12 +1,12 @@
 from sqlalchemy.orm import Session
-from ..models import Memory, MediaItem
+from .evidence import EXPLICIT_SOURCES, personal_memories
 
 POSITIVE = ("love", "loved", "like", "liked", "enjoy", "favorite", "favourite", "prefer", "best", "great")
 NEGATIVE = ("hate", "hated", "dislike", "disliked", "boring", "slow", "avoid", "never")
 
 def build_profile(db: Session):
-    memories = db.query(Memory).order_by(Memory.created_at.desc()).all()
-    explicit = [m for m in memories if m.source != "inferred"]
+    memories = personal_memories(db).order_by(Memory.created_at.desc()).all()
+    explicit = [m for m in memories if m.source in EXPLICIT_SOURCES]
     inferred = [m for m in memories if m.source == "inferred"]
     themes = {}
     for m in memories:
@@ -14,6 +14,7 @@ def build_profile(db: Session):
     positives = [m.content for m in memories if any(w in (m.content or '').lower().split() for w in POSITIVE)]
     negatives = [m.content for m in memories if any(w in (m.content or '').lower().split() for w in NEGATIVE)]
     return {
+        "imported_count": sum(m.source == "chatgpt_import" for m in memories),
         "memory_count": len(memories),
         "explicit_count": len(explicit),
         "inferred_count": len(inferred),

@@ -4,7 +4,8 @@ from typing import Annotated, Literal
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import or_
 
-from ..models import MediaItem, Memory
+from ..models import LocalAIRecord, MediaItem
+from .evidence import taste_memories, EXPLICIT_SOURCES, same_work
 from . import ollama
 from .rating_feedback import latest_feedback, title_key
 
@@ -25,10 +26,10 @@ class Prediction(BaseModel):
 
 def prediction_prompt(db, title):
     name = title["title"].strip().casefold()
-    memories = db.query(Memory).filter_by(is_demo=False).order_by(Memory.created_at.desc()).limit(40).all()
+    memories = taste_memories(db)
     preferences = [
         {"category": memory.category, "source": memory.source, "content": memory.content[:500]}
-        for memory in memories if name not in memory.content.casefold()
+        for memory in memories if memory.source in EXPLICIT_SOURCES and name not in memory.content.casefold()
         and memory.category.casefold() not in {"games", "books", "software_engineering", "learning", "ai_product", "watchlist"}
     ][:20]
     history = db.query(MediaItem).filter(
@@ -41,10 +42,14 @@ def prediction_prompt(db, title):
         item.media_type == title["media_type"],
         len(genres & {genre.strip().casefold() for genre in item.genres.split(",")}),
     ), reverse=True)
+    reasons = {}
+    for row in db.query(LocalAIRecord).filter_by(kind="rating_revision").order_by(LocalAIRecord.created_at.desc()):
+        media_id = row.data.get("media", {}).get("id")
+        reasons.setdefault(media_id, row.data.get("reason", ""))
     examples = [
         {"title": item.title, "genres": item.genres, "rating": item.personal_rating,
-         "sentiment": item.sentiment, "status": item.status}
-        for item in history if item.title.strip().casefold() != name
+         "sentiment": item.sentiment, "status": item.status, "rating_reason": reasons.get(item.id, "")[:400]}
+        for item in history if not same_work(item, title) and item.title.strip().casefold() != name
     ][:16]
     context = {key: title.get(key) for key in (
         "title", "media_type", "release_year", "description", "genres", "runtime", "intensity", "seasons", "episodes",
@@ -64,7 +69,9 @@ def prediction_prompt(db, title):
             "its decimal precision, and explain how it informs the prediction. Use corrections for similar titles as taste evidence. "
             "Address the viewer as you. Keep every field spoiler-free. In explanation, explain the specific score "
             "by weighing the strongest fit against what holds it back, using supplied viewing tastes or ratings. "
-            "Completion alone is not evidence of enjoyment. Ignore preferences about app design or formatting. "
+            "Completion alone is not evidence of enjoyment. Prioritize curiosity, meaningful stakes, progression and payoff across genres. "
+            "Use explicit reasons without generalizing a reaction to one work to an entire genre. Never infer hook speed, "
+            "English dub or release availability from language or country. Ignore preferences about app design or formatting. "
             "Give two or three distinct, concise points in what_you_might_like and one to three concrete drawbacks "
             "in what_you_might_dislike. Focus on the title's premise, genre, length or intensity when provided. "
             "In recommendation say when to choose this title, with a verdict consistent with the score and caveats. "

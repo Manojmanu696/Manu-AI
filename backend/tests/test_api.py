@@ -21,12 +21,18 @@ def test_demo_recommendations_and_chat(client, monkeypatch):
     from app.services import ollama
 
     monkeypatch.setattr(ollama, "available", lambda: False)
-    assert client.post("/demo/load").json()["loaded"]
-    recommendations = client.get("/recommendations").json()
-    assert recommendations and recommendations[0]["score"] <= 99
+    from app.database import SessionLocal
+    from app.demo import load_demo
+    with SessionLocal() as db:
+        load_demo(db)
+    assert client.post("/demo/load").status_code == 409
+    assert client.get("/recommendations").json() == []
+    assert client.get("/media").json() == []
+    assert client.get("/memories").json() == []
+    assert client.post("/media", json={"title": "Arrival", "media_type": "movie", "release_year": 2016}).status_code == 201
     chat = client.post("/chat", json={"message":"What should I watch tonight?"}).json()
     assert chat["mode"] == "local"
-    assert chat["recommendations"]
+    assert [row["title"] for row in chat["recommendations"]] == ["Arrival"]
 
 
 def test_portable_export_and_restore(client):

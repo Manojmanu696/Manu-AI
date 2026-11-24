@@ -1,7 +1,7 @@
 export const mediaTypes = { movie: "Movie", tv: "TV Series", anime: "Anime" } as const;
 export type ScreenType = keyof typeof mediaTypes;
 export const statuses = {
-  recommended: "Recommended", want: "Want to Watch", current: "Watching",
+  unknown: "Unknown", unwatched: "Not watched", recommended: "Recommended", want: "Want to Watch", current: "Watching",
   completed: "Watched", dropped: "Dropped", on_hold: "On Hold",
 } as const;
 export type Status = keyof typeof statuses;
@@ -46,6 +46,7 @@ export type CutTitle = {
   source_url?: string;
   release_label?: string;
   language?: string;
+  audio_languages?: string[];
   trailer_url?: string;
   cast?: Credit[];
   crew?: Credit[];
@@ -59,9 +60,11 @@ export type CutTitle = {
   intensity?: string;
   related?: CutTitle[];
   is_demo?: boolean;
+  verdict?: string;
+  caveat?: string;
 };
 
-export type BrowseData = { library: CutTitle[]; catalogue: CutTitle[]; reviewed: CutTitle[]; public_search: boolean };
+export type BrowseData = { library: CutTitle[]; catalogue: CutTitle[]; fresh: CutTitle[]; reviewed: CutTitle[]; public_search: boolean };
 export type Checkpoint = {
   id: number; viewing_date: string; minute: number | null; season: number | null; episode: number | null;
   headline: string; notes: string; feeling: string; pacing: string; rating: number | null;
@@ -71,12 +74,21 @@ export type Review = {
   rating: number; verdict: string; body: string; tags: string; spoiler_notes: string; spoiler: boolean;
   finalized_at: string; updated_at: string;
 };
-export type TitleData = { title: CutTitle; checkpoints: Checkpoint[]; review: Review | null; rating_feedback: RatingFeedback | null; metadata_notice: string; region: string };
+export type RatingRevision = {
+  source: string; score?: number | null; range?: [number, number]; scale: number; precision: string; recorded_at: string;
+};
+export type TitleData = { title: CutTitle; rating_history: RatingRevision[]; checkpoints: Checkpoint[]; review: Review | null; rating_feedback: RatingFeedback | null; metadata_notice: string; region: string };
 
 export const cutPath = (title: CutTitle) => `/title/${title.source}/${title.id}`;
 export const titleApi = (title: CutTitle) => `/cinema/titles/${title.source}/${title.id}`;
 export const splitLabels = (text = "") => text.split(/[,|]/).map(label => label.trim()).filter(Boolean);
 export const titleTime = (title: CutTitle) => title.seasons ? `${title.seasons} ${title.seasons === 1 ? "season" : "seasons"}` : title.runtime || (title.episodes ? `${title.episodes} episodes` : "");
+export function watchMinutes(title: CutTitle) {
+  const duration = /^(\d+)\s*min(?:\s*(?:per episode|\/episode))?$/i.exec(title.episode_duration || title.runtime || "");
+  if (title.media_type === "movie") return duration ? Number(duration[1]) : undefined;
+  return title.total_runtime_minutes || (duration && title.episodes ? Number(duration[1]) * title.episodes : undefined);
+}
+
 export function totalWatchTime(title: CutTitle) {
   if (title.media_type === "movie") return title.runtime;
   const duration = /^(\d+)\s*min(?:\s+per episode)?$/i.exec(title.episode_duration || title.runtime || "");

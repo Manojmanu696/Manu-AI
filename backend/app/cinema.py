@@ -5,7 +5,6 @@ from pathlib import Path
 import re
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 from pydantic import ValidationError
 
@@ -15,9 +14,10 @@ from .models import CatalogueItem, FilmReview, LocalAIRecord, MediaItem, Viewing
 from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, ReviewDraftRequest
 from .services import ollama, tvmaze, title_prediction, watch_listings
 from .services.rating_feedback import latest_feedback, title_key
-from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, identity, search_tmdb
-from .services.discovery import _public_score, score_catalogue_item
+from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, search_tmdb
+from .services.discovery import _public_score, discover
 from .services.local_ai_records import add_record
+from .services.evidence import change_rating, change_status as set_viewing_status, lock_writes, personal_media, same_work
 
 router = APIRouter(prefix="/cinema", tags=["cinema"])
 RANKINGS = json.loads(Path(__file__).with_name("cinema_rankings.json").read_text(encoding="utf-8"))
@@ -59,24 +59,16 @@ def serialize_title(item, source):
 
 
 def find_owned(db, title):
-    candidates = db.query(MediaItem).filter_by(media_type=title["media_type"]).order_by(MediaItem.id).all()
+    candidates = personal_media(db).order_by(MediaItem.id).all()
     return match_owned(candidates, title)
 
 
 def match_owned(candidates, title):
-    candidates = [item for item in candidates if item.media_type == title["media_type"]]
-    external_id = title.get("external_id")
-    if external_id:
-        for item in candidates:
-            if external_id in {item.external_id, demo_details(item).get("external_id")}:
-                return item
-    key = title["media_type"], title.get("release_year"), title["title"].strip().casefold()
-    return next((item for item in candidates if identity(item) == key and
-                 not (external_id and item.external_id and item.external_id != external_id)), None)
+    return next((item for item in candidates if not item.is_demo and same_work(item, title)), None)
 
 
 def media_record(db, item_id, lock=False):
-    query = db.query(MediaItem).filter(MediaItem.id == item_id, MediaItem.media_type.in_(SCREEN_TYPES))
+    query = personal_media(db).filter(MediaItem.id == item_id, MediaItem.media_type.in_(SCREEN_TYPES))
     item = query.with_for_update().first() if lock else query.first()
     if item is None:
         raise HTTPException(404, "Title not found.")
@@ -85,8 +77,7 @@ def media_record(db, item_id, lock=False):
 
 def lock_sqlite(db):
     # Serialize read-before-write operations across requests to the local database.
-    if db.get_bind().dialect.name == "sqlite":
-        db.execute(text("BEGIN IMMEDIATE"))
+    lock_writes(db)
 
 
 def tmdb_id(title):
@@ -97,7 +88,7 @@ def tmdb_id(title):
 
 def catalogue_record(db, item_id):
     item = db.get(CatalogueItem, item_id)
-    if item is None or item.media_type not in SCREEN_TYPES:
+    if item is None or item.is_demo or item.media_type not in SCREEN_TYPES:
         raise HTTPException(404, "Title not found.")
     return item
 
@@ -130,32 +121,36 @@ def ranked_record(db, item_id):
         raise HTTPException(404, "Title not found.")
     pick = groups[group][rank - 1]
     row = db.query(CatalogueItem).filter(
-        CatalogueItem.media_type == pick["media_type"], CatalogueItem.release_year == pick["release_year"],
+        CatalogueItem.is_demo.is_(False), CatalogueItem.media_type == pick["media_type"], CatalogueItem.release_year == pick["release_year"],
         CatalogueItem.title.ilike(pick["title"].replace("%", r"\%").replace("_", r"\_"), escape="\\"),
     ).order_by(CatalogueItem.id).first()
-    return {**(serialize_title(row, "catalogue") if row else {}), **pick}
+    if row:
+        return {**serialize_title(row, "catalogue"), **pick}
+    return pick.copy()
 
 
 @router.get("/browse")
 def browse(db: Session = Depends(get_db)):
-    library = db.query(MediaItem).filter(MediaItem.media_type.in_(SCREEN_TYPES)).order_by(MediaItem.date_added.desc()).all()
+    library = personal_media(db).filter(MediaItem.media_type.in_(SCREEN_TYPES)).order_by(MediaItem.date_added.desc()).all()
     media = [serialize_title(item, "media") for item in library]
-    rows = db.query(CatalogueItem).filter(CatalogueItem.media_type.in_(SCREEN_TYPES)).order_by(CatalogueItem.id).all()
-    owned_keys = {identity(item) for item in library}
-    owned_ids = {(item["media_type"], item["external_id"]) for item in media if item.get("external_id")}
+    rows = db.query(CatalogueItem).filter(CatalogueItem.is_demo.is_(False), CatalogueItem.media_type.in_(SCREEN_TYPES)).order_by(CatalogueItem.id).all()
     catalogue = []
     for row in rows:
         title = serialize_title(row, "catalogue")
-        if identity(row) in owned_keys or (row.media_type, title.get("external_id")) in owned_ids:
+        if any(same_work(row, owned) for owned in library):
             continue
-        title["score"], title["reasons"] = score_catalogue_item(db, row)
         catalogue.append(title)
-    catalogue.sort(key=lambda item: item["score"], reverse=True)
+    fresh = [
+        {**serialize_title(entry["item"], "catalogue"), **{key: entry[key] for key in ("score", "reasons", "verdict", "caveat")}}
+        for entry in discover(db, limit=50)
+        if entry["item"].media_type in SCREEN_TYPES
+    ]
     by_id = {item["id"]: item for item in media}
     reviews = db.query(FilmReview).order_by(FilmReview.updated_at.desc(), FilmReview.media_item_id).all()
     return {
         "library": media,
         "catalogue": catalogue,
+        "fresh": fresh,
         "reviewed": [by_id[row.media_item_id] for row in reviews if row.media_item_id in by_id],
         "public_search": True,
     }
@@ -171,7 +166,7 @@ def search(query: str = Query(min_length=2, max_length=200), media_type: str = "
     normalized = query.casefold()
     found = []
     for model, source in ((MediaItem, "media"), (CatalogueItem, "catalogue")):
-        rows = db.query(model).filter(model.media_type.in_((media_type,) if media_type else SCREEN_TYPES),
+        rows = db.query(model).filter(model.is_demo.is_(False), model.media_type.in_((media_type,) if media_type else SCREEN_TYPES),
                                       model.title.icontains(query, autoescape=True)).limit(30).all()
         found.extend(serialize_title(row, source) for row in rows)
     if TMDB_API_KEY:
@@ -186,11 +181,13 @@ def search(query: str = Query(min_length=2, max_length=200), media_type: str = "
             found.extend(item for item in tvmaze.search_series(query) if not media_type or item["media_type"] == media_type)
         except (OSError, ValueError):
             pass
-    unique = {}
+    found.extend(pick for group in RANKED_TITLES.values() for pick in group
+                 if query.casefold() in pick["title"].casefold() and (not media_type or pick["media_type"] == media_type))
+    unique = []
     for item in found:
-        key = (item["media_type"], item["title"].strip().casefold(), item.get("release_year"))
-        unique.setdefault(key, item)
-    return sorted(unique.values(), key=lambda item: item["title"].casefold() != normalized)[:24]
+        if not any(same_work(item, prior) for prior in unique):
+            unique.append(item)
+    return sorted(unique, key=lambda item: item["title"].casefold() != normalized)[:24]
 
 
 @router.get("/titles/{source}/{item_id}")
@@ -211,10 +208,8 @@ def load_title(db, source, item_id, region, *, card=False):
     if source == "media":
         owned = media_record(db, item_id)
         title = serialize_title(owned, source)
-        candidates = db.query(CatalogueItem).filter_by(media_type=owned.media_type).all()
-        external_id = title.get("external_id")
-        row = next((candidate for candidate in candidates if identity(candidate) == identity(owned) and
-                    not (external_id and candidate.external_id and candidate.external_id != external_id)), None)
+        candidates = db.query(CatalogueItem).filter_by(media_type=owned.media_type, is_demo=False).all()
+        row = next((candidate for candidate in candidates if same_work(candidate, owned)), None)
         if row:
             title = {**serialize_title(row, "catalogue"), **title}
     elif source == "catalogue":
@@ -225,7 +220,7 @@ def load_title(db, source, item_id, region, *, card=False):
         title = ranked_record(db, item_id)
         owned = find_owned(db, title)
     elif source == "tvmaze":
-        owned = db.query(MediaItem).filter_by(external_id=f"tvmaze:{item_id}").first()
+        owned = personal_media(db).filter_by(external_id=f"tvmaze:{item_id}").first()
         try:
             title = tvmaze.series_details(item_id)
         except OSError as exc:
@@ -268,6 +263,8 @@ def load_title(db, source, item_id, region, *, card=False):
         for key in ("image_url", "genres", "description", "runtime", "episode_duration", "seasons", "episodes"):
             if not title.get(key) and listings.get(key):
                 title[key] = listings[key]
+        if listings.get("audio_languages"):
+            title["audio_languages"] = listings["audio_languages"]
         if listings.get("watch_url") and not title.get("provider_data_available"):
             title.update({key: listings[key] for key in ("providers", "watch_url", "provider_data_available")})
             title["provider_source"] = "JustWatch"
@@ -278,15 +275,13 @@ def load_title(db, source, item_id, region, *, card=False):
     feedback = latest_feedback(db).get(title_key(title))
     if card:
         return {"title": title, "rating_feedback": feedback}
-    if row is not None:
-        title["score"], title["reasons"] = score_catalogue_item(db, row)
-    elif source in SCREEN_TYPES:
+    if not card:
         title["score"], title["reasons"] = _public_score(db, title)
 
     local_related = []
     if not title.get("related"):
         genres = {genre.strip().casefold() for genre in title.get("genres", "").split(",") if genre.strip()}
-        candidates = db.query(CatalogueItem).filter(CatalogueItem.media_type == title["media_type"]).order_by(CatalogueItem.id)
+        candidates = db.query(CatalogueItem).filter(CatalogueItem.is_demo.is_(False), CatalogueItem.media_type == title["media_type"]).order_by(CatalogueItem.id)
         for candidate in candidates:
             entry = serialize_title(candidate, "catalogue")
             other_genres = {genre.strip().casefold() for genre in candidate.genres.split(",")}
@@ -298,7 +293,7 @@ def load_title(db, source, item_id, region, *, card=False):
 
     if title["related"]:
         related_types = {entry["media_type"] for entry in title["related"]}
-        candidates = db.query(MediaItem).filter(MediaItem.media_type.in_(related_types)).order_by(MediaItem.id).all()
+        candidates = personal_media(db).filter(MediaItem.media_type.in_(related_types)).order_by(MediaItem.id).all()
         for entry in title["related"]:
             related_owned = match_owned(candidates, entry)
             if related_owned is not None:
@@ -312,15 +307,21 @@ def load_title(db, source, item_id, region, *, card=False):
             ViewingCheckpoint.viewing_date, ViewingCheckpoint.id
         ).all()
         review = db.get(FilmReview, owned.id)
+    rating_history = []
+    for event in db.query(LocalAIRecord).filter_by(kind="rating_revision").order_by(LocalAIRecord.created_at.desc()):
+        reference = event.data.get("media")
+        if isinstance(reference, dict) and ((owned and reference.get("id") == owned.id) or same_work(reference, title)):
+            rating_history.append({**event.data, "recorded_at": event.created_at.isoformat() + "Z"})
     return {
         "title": title, "checkpoints": [serialize_checkpoint(point) for point in checkpoints],
+        "rating_history": rating_history,
         "rating_feedback": feedback,
         "review": serialize_review(review) if review else None, "metadata_notice": warning, "region": region,
     }
 
 
 def public_owned(db, source, item_id):
-    return db.query(MediaItem).filter_by(media_type=source, external_id=f"tmdb:{item_id}").order_by(MediaItem.id).first()
+    return personal_media(db).filter_by(media_type=source, external_id=f"tmdb:{item_id}").order_by(MediaItem.id).first()
 
 
 def prediction_context(db, title):
@@ -381,9 +382,7 @@ def mutation_target(db, source, item_id, new_status):
         values = {key: title[key] for key in fields if key in title}
         if not values.get("external_url") and title.get("source_url"):
             values["external_url"] = title["source_url"]
-        item = MediaItem(**values, status=new_status)
-        if new_status == "completed":
-            item.date_completed = now()
+        item = MediaItem(**values, status="unknown")
         db.add(item)
         db.flush()
     return item
@@ -396,10 +395,12 @@ def add_title(payload: MediaCreate, db: Session = Depends(get_db)):
     lock_sqlite(db)
     item = find_owned(db, payload.model_dump())
     if item is None:
-        item = MediaItem(**payload.model_dump())
-        if item.status == "completed":
-            item.date_completed = now()
+        values = payload.model_dump(exclude={"status", "personal_rating"})
+        item = MediaItem(**values, status="unknown")
         db.add(item)
+        set_viewing_status(db, item, payload.status, "user")
+        if payload.personal_rating is not None:
+            change_rating(db, item, payload.personal_rating, "user")
     db.commit()
     return serialize_title(item, "media")
 
@@ -407,9 +408,7 @@ def add_title(payload: MediaCreate, db: Session = Depends(get_db)):
 @router.put("/titles/{source}/{item_id}/status")
 def change_status(source: str, item_id: int, payload: CinemaStatus, db: Session = Depends(get_db)):
     item = mutation_target(db, source, item_id, payload.status)
-    item.status = payload.status
-    if item.status == "completed" and not item.date_completed:
-        item.date_completed = now()
+    set_viewing_status(db, item, payload.status, "user")
     db.commit()
     return serialize_title(item, "media")
 
@@ -425,6 +424,8 @@ def add_checkpoint(source: str, item_id: int, payload: CheckpointCreate, db: Ses
             raise HTTPException(422, "The checkpoint exceeds the movie runtime.")
     elif payload.minute is not None or payload.season is None or payload.episode is None:
         raise HTTPException(422, "Enter a season and an episode.")
+    if item.status == "unknown":
+        set_viewing_status(db, item, "current", "checkpoint")
     point = ViewingCheckpoint(media_item_id=item.id, viewing_date=payload.viewing_date,
                               details=payload.model_dump(exclude={"viewing_date"}))
     db.add(point)
@@ -434,14 +435,14 @@ def add_checkpoint(source: str, item_id: int, payload: CheckpointCreate, db: Ses
 
 @router.put("/titles/{source}/{item_id}/review")
 def save_review(source: str, item_id: int, payload: ReviewCreate, db: Session = Depends(get_db)):
-    item = mutation_target(db, source, item_id, "completed")
+    item = mutation_target(db, source, item_id, "unknown")
     review = db.get(FilmReview, item.id)
     if review is None:
         review = FilmReview(media_item_id=item.id)
         db.add(review)
     review.details = payload.model_dump()
     review.updated_at = now()
-    item.personal_rating = payload.rating
+    change_rating(db, item, payload.rating, "user_review", reason=payload.body)
     db.commit()
     return {"review": serialize_review(review), "title": serialize_title(item, "media")}
 

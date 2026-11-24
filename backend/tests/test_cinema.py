@@ -30,8 +30,7 @@ def test_title_prediction_uses_ollama_without_target_rating(client, monkeypatch)
     assert prediction["score"] == 8.6 and prediction["provider"] == "ollama"
     assert len(prediction["what_you_might_like"]) == 2
     history = client.get("/data/export/json").json()["local_ai_records"]
-    assert history[0]["kind"] == "prediction"
-    assert history[0]["data"]["prediction"] == prediction
+    assert next(row["data"]["prediction"] for row in history if row["kind"] == "prediction") == prediction
     assert client.get(route).json()["title"]["personal_rating"] == 9
     monkeypatch.setattr(ollama, "chat", lambda *args, **kwargs: {"message": {"content": '{"score": 12}'}})
     assert client.post(f"{route}/prediction").status_code == 502

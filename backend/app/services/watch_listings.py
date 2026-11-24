@@ -84,10 +84,14 @@ def parse_title(html, name, year, media_type, region):
     image_id = (record.get("image") or {}).get("@id")
     poster = next((node.get("contentUrl") for node in graph if node.get("@id") == image_id), None)
     providers = {}
+    audio_languages = set()
     for action in record.get("potentialAction") or []:
         offer = action.get("expectsAcceptanceOf") or {}
         if (offer.get("eligibleRegion") or {}).get("name") != region:
             continue
+        for prop in offer.get("additionalProperty") or []:
+            if prop.get("name") == "audioLanguage" and isinstance(prop.get("value"), list):
+                audio_languages.update(str(code).lower() for code in prop["value"])
         provider = (offer.get("offeredBy") or {}).get("name")
         access = ACCESS.get((offer.get("businessFunction") or "").split("#")[-1], "Streaming")
         if access == "Subscription" and offer.get("price") == 0:
@@ -111,7 +115,7 @@ def parse_title(html, name, year, media_type, region):
         "description": record.get("description"), "runtime": f"{minutes} min" if minutes and expected == "Movie" else None,
         "episode_duration": f"{minutes} min" if minutes and expected == "TVSeries" else None,
         "seasons": season_count, "episodes": episodes or None,
-        "providers": list(providers.values()), "watch_url": watch_url,
+        "audio_languages": sorted(audio_languages), "providers": list(providers.values()), "watch_url": watch_url,
         "provider_data_available": bool(providers) or page.no_offers or (record.get("offers") or {}).get("offerCount") == 0,
     }
 

@@ -18,7 +18,7 @@ export default function Dashboard({ view }: { view?: string }) {
  useEffect(()=>{void refresh()},[]);
  if(loading)return <div className="boot"><span className="brand-mark">M</span><p>Opening Manu AI…</p></div>;
  const label=labels[page]||"Home";
- return <div className="shell cinema-shell"><Sidebar active={page}/><main className="main">{page==="home"?<><CinemaHome items={items} recommendations={recs} onRefresh={refresh}/><CutBrowse view="home" embedded/></>:<><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{(page==="game"||page==="book")&&<Library key={page} label={label} items={items.filter(x=>x.media_type===page)}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</>}</main></div>;
+ return <div className="shell cinema-shell"><Sidebar active={page}/><main className="main">{page==="home"?<><CinemaHome items={items} recommendations={recs} onRefresh={refresh}/><CutBrowse view="home" embedded/></>:<><header className="topbar"><div className="crumb">Manu AI <span>/</span> {label}</div><div className="top-actions"><div className="avatar">M</div></div></header>{(page==="game"||page==="book")&&<Library key={page} label={label} items={items.filter(x=>x.media_type===page)}/>} {page==="memory"&&<MemoryPage memories={memories} refresh={refresh}/>} {page==="data"&&<DataPage summary={summary} refresh={refresh}/>} {page==="ai"&&<AIPage/>} {page==="settings"&&<Settings/>}</>}</main></div>;
 }
 
 
@@ -26,7 +26,30 @@ function Library({label,items}:{label:string;items:MediaItem[]}){const[q,setQ]=u
 
 function MemoryPage({memories,refresh}:{memories:Memory[];refresh:()=>void}){const[text,setText]=useState("");const[category,setCategory]=useState("favorite genres");async function add(e:React.FormEvent){e.preventDefault();if(!text.trim())return;await api("/memories",{method:"POST",body:JSON.stringify({category,content:text,source:"user"})});setText("");refresh()}return <div className="content"><section className="page-intro narrow"><p className="eyebrow">MEMORY</p><h1>Your taste profile.</h1><p>Preferences here influence personalized ranking.</p></section><section className="panel memory-add"><form onSubmit={add}><select value={category} onChange={e=>setCategory(e.target.value)}><option>favorite genres</option><option>disliked genres</option><option>preferred pacing</option><option>preferred runtime</option><option>favorite themes</option><option>things to avoid</option></select><input value={text} onChange={e=>setText(e.target.value)} placeholder="Add a preference…"/><button className="primary-button">Save</button></form></section><div className="memory-cards">{memories.map(m=><article className="memory-card" key={m.id}><div><span>{m.category}</span><p>{m.content}</p></div><button className="danger-button" onClick={async()=>{await api(`/memories/${m.id}`,{method:"DELETE"});refresh()}}>Delete</button></article>)}</div></div>}
 
-function DataPage({ summary }: { summary: Summary | null }) {
+function DataPage({ summary, refresh }: { summary: Summary | null; refresh: () => Promise<void> }) {
+  const [issues, setIssues] = useState<{id: string; data: {title?: string; reason: string}}[]>([]);
+  const [importState, setImportState] = useState("");
+  const [busy, setBusy] = useState(false);
+  async function loadIssues() {
+    setIssues(await api("/data/review"));
+  }
+  useEffect(() => { void loadIssues().catch(() => {}); }, []);
+  async function importData(file: File) {
+    setBusy(true);
+    try {
+      const body = new FormData();
+      body.set("file", file);
+      const result = await fetch(`${API_URL}/data/import`, {method:"POST", body});
+      const report = await result.json();
+      if (!result.ok) throw new Error(report.detail);
+      setImportState(`Import finished. ${report.media_added} new titles, ${report.conflicts} flagged conflicts.`);
+      await Promise.all([loadIssues(), refresh()]);
+    } catch (failure) {
+      setImportState(failure instanceof Error ? failure.message : "Import failed.");
+    } finally {
+      setBusy(false);
+    }
+  }
   const total = summary ? Object.values(summary.counts).reduce((sum, count) => sum + count, 0) : 0;
   return <div className="content">
     <section className="page-intro narrow">
@@ -42,6 +65,19 @@ function DataPage({ summary }: { summary: Summary | null }) {
       <div><span>Memories</span><b>{summary?.memories || 0}</b></div>
       <div><span>Database</span><b>{summary ? `${Math.round(summary.database_bytes / 1024)} KB` : "—"}</b></div>
     </div>
+    <section>
+      <h2>Import a backup</h2>
+      <input type="file" accept=".json,.zip" aria-label="Import a backup" disabled={busy} onChange={event => {
+        const file = event.currentTarget.files?.[0];
+        if (file) void importData(file);
+        event.currentTarget.value = "";
+      }}/>
+      {importState && <p role="status">{importState}</p>}
+    </section>
+    <section>
+      <h2>Records to review</h2>
+      {issues.length ? <ul>{issues.map(({id,data}) => <li key={id}><strong>{data.title || "Imported data"}</strong> · {data.reason}</li>)}</ul> : <p>No conflicts are flagged.</p>}
+    </section>
   </div>;
 }
 
