@@ -69,7 +69,7 @@ def test_restore_preserves_user_edits_and_restores_source_tables(client):
     with SessionLocal() as db:
         db.add(CatalogueItem(id=1, title="Research title", media_type="movie", release_year=2012))
         db.flush()
-        db.add(RecommendationFeedback(catalogue_item_id=1, action="like"))
+        db.add(RecommendationFeedback(catalogue_item_id=1, action="completed"))
         db.add(ResearchSource(catalogue_item_id=1, url="https://example.com/"))
         db.commit()
     archive = client.get("/data/export/json").json()
@@ -86,6 +86,7 @@ def test_restore_preserves_user_edits_and_restores_source_tables(client):
     assert client.post("/data/import?replace=true", files={"file": ("data.json", json.dumps(archive))}).status_code == 200
     restored = client.get("/data/export/json").json()
     assert len(restored["recommendation_feedback"]) == len(restored["research_sources"]) == 1
+    assert restored["recommendation_feedback"][0]["action"] == "completed"
     assert restored["media_items"][0]["personal_rating"] == 8
 
 
@@ -114,3 +115,10 @@ def test_audio_and_total_runtime_require_evidence():
     assert not meets_constraints(title, "English", 287)
     assert not meets_constraints(title, "Japanese", 300)
     assert not meets_constraints({"title": "Unknown", "media_type": "movie"}, "English", 300)
+
+
+def test_curated_shortlist_excludes_confirmed_dropped_titles(client):
+    assert any(row["title"] == "Severance" for row in client.get("/cinema/rankings").json()["Series"])
+    assert client.post("/media", json={"title": "Severance", "media_type": "tv", "status": "dropped",
+                                      "release_year": 2022}).status_code == 201
+    assert "Severance" not in {row["title"] for row in client.get("/cinema/rankings").json()["Series"]}

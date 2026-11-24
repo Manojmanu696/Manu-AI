@@ -78,6 +78,7 @@ def build_zip(db: Session) -> Path:
     payload = export_payload(db)
     stamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     path = BACKUP_DIR / f"ManuAI_Backup_{stamp}_{uuid4().hex[:8]}.zip"
+    path.touch(mode=0o600, exist_ok=False)
     with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as archive:
         archive.writestr("manu-ai-data.json", json.dumps(payload, indent=2))
         archive.writestr("media-items.csv", csv_text(payload["media_items"]))
@@ -275,7 +276,8 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
         for raw in records(payload, key):
             parent = raw.get("catalogue_item_id")
             values = {field: raw[field] for field in fields}
-            if model is RecommendationFeedback and values["action"] not in {"like", "not_for_me", "watchlist", "watched"}:
+            # Historical imports used "completed" without recording whether a user confirmed it.
+            if model is RecommendationFeedback and values["action"] not in {"like", "not_for_me", "watchlist", "watched", "completed"}:
                 raise ValueError("Invalid recommendation feedback.")
             values.update(catalogue_item_id=catalogue_map[parent] if parent is not None else None)
             values[time_key] = _parse_date(raw[time_key])

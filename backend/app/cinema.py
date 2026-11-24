@@ -17,7 +17,8 @@ from .services.rating_feedback import latest_feedback, title_key
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, search_tmdb
 from .services.discovery import _public_score, discover
 from .services.local_ai_records import add_record
-from .services.evidence import change_rating, change_status as set_viewing_status, lock_writes, personal_media, same_work
+from .services.evidence import FRESH_EXCLUSIONS, change_rating, change_status as set_viewing_status, lock_writes, personal_media, same_work
+from .services.recommendations import feedback_by_title
 
 router = APIRouter(prefix="/cinema", tags=["cinema"])
 RANKINGS = json.loads(Path(__file__).with_name("cinema_rankings.json").read_text(encoding="utf-8"))
@@ -110,8 +111,14 @@ def public_record(source, item_id, region):
 
 
 @router.get("/rankings")
-def rankings():
-    return RANKED_TITLES
+def rankings(db: Session = Depends(get_db)):
+    excluded = [item for item in personal_media(db) if item.status in FRESH_EXCLUSIONS or item.sentiment == "dislike"]
+    feedback = feedback_by_title(db)
+    if feedback:
+        excluded.extend(item for item in db.query(CatalogueItem).filter_by(is_demo=False)
+                        if feedback.get(item.id) in {"watched", "not_for_me"})
+    return {category: [title for title in titles if not any(same_work(title, item) for item in excluded)]
+            for category, titles in RANKED_TITLES.items()}
 
 
 def ranked_record(db, item_id):

@@ -78,6 +78,8 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
   const [status, setStatus] = useState(selectedStatus);
   const [language, setLanguage] = useState("");
   const [duration, setDuration] = useState("");
+  const [constrained, setConstrained] = useState<{key: string; items: CutTitle[]}>();
+  const [constraintError, setConstraintError] = useState("");
   const [publicState, setPublicState] = useState<{ key: string; items: CutTitle[]; error?: string }>();
   const [attempt, setAttempt] = useState(0);
   useEffect(() => { setQuery(initialQuery); }, [initialQuery]);
@@ -102,7 +104,30 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
   }, [canSearchPublic, mediaType, publicKey, query, attempt]);
 
   const freshOnly = view === "discover" && !query.trim() && (!status || status === "recommended");
-  const local = isReviews ? data.reviewed : isLibrary ? data.library : freshOnly ? data.fresh : [...data.library, ...data.catalogue];
+  const verifyConstraints = freshOnly && !!(language || duration);
+  const constraintKey = JSON.stringify([mediaType, language, duration]);
+  useEffect(() => {
+    if (!verifyConstraints) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setConstraintError("");
+      const query = new URLSearchParams({ limit: "30" });
+      if (mediaType) query.set("media_type", mediaType);
+      if (language) query.set("language", language);
+      if (duration && Number(duration) > 0) query.set("max_minutes", duration);
+      api<{item: CutTitle; source: string; score: number; reasons: string[]; verdict: string; caveat: string}[]>(
+        `/discover?${query}`, {signal: controller.signal},
+      ).then(rows => {
+        if (!controller.signal.aborted) setConstrained({key: constraintKey, items: rows.flatMap(row =>
+          row.item.media_type in mediaTypes ? [{
+            ...row.item, source: row.source === "public_tmdb" ? row.item.media_type : "catalogue",
+            score: row.score, reasons: row.reasons, verdict: row.verdict, caveat: row.caveat,
+          }] : [])});
+      }).catch(failure => { if (!controller.signal.aborted) setConstraintError(messageFrom(failure)); });
+    }, 300);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [verifyConstraints, mediaType, language, duration, constraintKey]);
+  const local = isReviews ? data.reviewed : isLibrary ? data.library : freshOnly ? (verifyConstraints ? constrained?.key === constraintKey ? constrained.items : [] : data.fresh) : [...data.library, ...data.catalogue];
   const publicTitles = canSearchPublic && publicState?.key === publicKey && !publicState.error
     ? publicState.items.filter((title, index, all) => !local.some(own => sameTitle(own, title)) && all.findIndex(other => sameTitle(other, title)) === index)
     : [];
@@ -113,13 +138,14 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
     (!query.trim() || title.title.toLowerCase().includes(query.trim().toLowerCase()) || publicTitles.includes(title)) &&
     (!genre || splitLabels(title.genres).includes(genre)) &&
     (!year || title.release_year === Number(year)) &&
-    (!language || splitLabels(title.language).includes(language) ||
+    (verifyConstraints || !language || splitLabels(title.language).includes(language) ||
       title.audio_languages?.includes(({English:"en", Japanese:"ja", Hindi:"hi", Malayalam:"ml", Korean:"ko"} as Record<string,string>)[language])) &&
-    (!duration || (watchMinutes(title) ?? Infinity) <= Number(duration)) &&
+    (verifyConstraints || !duration || (watchMinutes(title) ?? Infinity) <= Number(duration)) &&
     (!rating || (cardRating(title)?.value ?? -1) >= Number(rating)) &&
     (!status || (status === "watchlist" ? title.status === "want" || title.status === "on_hold" : (title.status || "unknown") === status || status === "recommended" && freshOnly)),
   );
   const pendingPublic = canSearchPublic && publicState?.key !== publicKey;
+  const pendingConstraints = verifyConstraints && constrained?.key !== constraintKey && !constraintError;
   const publicError = canSearchPublic && publicState?.key === publicKey ? publicState.error : "";
   const canReset = !!(query || type || genre || year || status || rating || language || duration);
 
@@ -138,12 +164,13 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
       <label>Audio language<select value={language} onChange={event => setLanguage(event.target.value)}><option value="">Any verified language</option>{["English", "Japanese", "Hindi", "Malayalam", "Korean"].map(value => <option key={value}>{value}</option>)}</select></label>
       <label>Total minutes<input type="number" min={1} placeholder="Any length" value={duration} onChange={event => setDuration(event.target.value)}/></label>
     </form>
-    <div className="cut-results-head"><p role="status">{results.length} {results.length === 1 ? "title" : "titles"}{pendingPublic && " · Searching catalogues…"}</p>
+    <div className="cut-results-head"><p role="status">{results.length} {results.length === 1 ? "title" : "titles"}{pendingPublic && " · Searching catalogues…"}{pendingConstraints && " · Checking language and runtime…"}</p>
       {canReset && <button className="cut-text-button" onClick={() => { setQuery(""); setGenre(""); setYear(""); setType(""); setRating(""); setStatus(""); setLanguage(""); setDuration(""); if (initialQuery || initialGenre || selectedStatus) router.replace(`/browse/${view}`, { scroll: false }); }}>Clear filters</button>}
     </div>
     {publicError && <div className="cut-inline-notice" role="alert">{publicError} <button className="cut-text-button" onClick={() => { setPublicState(undefined); setAttempt(value => value + 1); }}>Retry</button></div>}
+    {verifyConstraints && constraintError && <p role="alert">{constraintError}</p>}
     {results.length ? <div className="cut-grid">{results.map(title => <Poster key={cutPath(title)} title={title} pending={saving === cutPath(title)} onSave={save}/>)}</div>
-      : !pendingPublic && <StatePanel title={canReset ? "No matching titles" : isReviews ? "No final reviews yet" : isLibrary ? "Your library is empty" : "No titles available"}>
+      : !pendingPublic && !pendingConstraints && <StatePanel title={canReset ? "No matching titles" : isReviews ? "No final reviews yet" : isLibrary ? "Your library is empty" : "No titles available"}>
         <p>{canReset ? "Try a different search or clear a filter." : isReviews ? "Open a title and write your first review." : "Find a title in Discover or add it to your library."}</p>
         {(isLibrary || isReviews) && <Link href="/browse/discover" className="cut-btn cut-secondary">Go to Discover <Glyph name="arrow"/></Link>}
       </StatePanel>}
