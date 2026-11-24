@@ -122,7 +122,7 @@ export function CardFacts({ title, prediction, feedback, pending, unavailable }:
     <div className="cut-poster-providers">
       <span>Watch in India</span>
       {providers.length ? <ProviderTiles providers={providers}/> : <p>{title.provider_data_available ? "No listings found" : "Availability unverified"}</p>}
-      <a href={streamingListings(title)} target="_blank" rel="noreferrer">JustWatch ↗</a>
+      <a href={streamingListings(title)} target="_blank" rel="noreferrer">Check listings ↗</a>
     </div>
   </div>;
 }
