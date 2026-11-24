@@ -274,7 +274,7 @@ def load_title(db, source, item_id, region, *, card=False):
             title["audio_languages"] = listings["audio_languages"]
         if listings.get("watch_url") and not title.get("provider_data_available"):
             title.update({key: listings[key] for key in ("providers", "watch_url", "provider_data_available")})
-            title["provider_source"] = "JustWatch"
+            title["provider_source"] = listings.get("provider_source", "JustWatch")
             if not title.get("source_url"):
                 title["source_url"] = listings["watch_url"]
     if owned:

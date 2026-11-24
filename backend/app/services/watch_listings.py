@@ -17,10 +17,17 @@ def slug(value):
 
 # The catalogue uses these short or English titles for entries with a different URL.
 ALIASES = {
+    ("tv", "marvel-s-agents-of-s-h-i-e-l-d", 2013): ("marvels-agents-of-s-h-i-e-l-d",),
     ("tv", "money-heist", 2017): ("paperhouse",),
     ("anime", "code-geass", 2006): ("code-geass-lelouch-of-the-rebellion",),
     ("anime", "kaiji-ultimate-survivor", 2007): ("kaiji",),
     ("anime", "parasyte-the-maxim", 2014): ("parasyte",),
+}
+# Exact AniList identities with India availability documented by Crunchyroll's
+# winter 2025 and fall 2026 lineups. These links open the corresponding episodes.
+CRUNCHYROLL_INDIA = {
+    "anilist:anime:170166": "https://www.crunchyroll.com/watch/GK9UG2Z72/so-time-begins-to-flow-again",
+    "anilist:anime:205909": "https://www.crunchyroll.com/watch/GE00384155HIIN/an-unwanted-repayment",
 }
 RELEASE_YEARS = {("movie", "the-invisible-guest", 2016): "2017"}
 ACCESS = {"ProvideService": "Subscription", "LeaseOut": "Rent", "Sell": "Buy"}
@@ -144,6 +151,13 @@ def title_listings(title, region):
     if not title.get("release_year") or not slug(title["title"]):
         return {}
     try:
-        return read_title(title["title"], title["release_year"], title["media_type"], region, int(time() // 3600))
+        listings = read_title(title["title"], title["release_year"], title["media_type"], region, int(time() // 3600))
     except (OSError, ValueError, TypeError, AttributeError):
-        return {}
+        listings = {}
+    if region == "IN" and title["media_type"] == "anime" and not listings.get("providers"):
+        url = CRUNCHYROLL_INDIA.get(title.get("external_id"))
+        if url:
+            return {**listings, "providers": [{"name": "Crunchyroll", "access": "Streaming", "url": url}],
+                    "watch_url": url, "provider_source": "Crunchyroll", "provider_data_available": True,
+                    "audio_languages": ["en"]}
+    return listings
