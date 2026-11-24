@@ -115,13 +115,13 @@ function Results({ data, view, saving, save }: { data: BrowseData; view: string;
       if (mediaType) query.set("media_type", mediaType);
       if (language) query.set("language", language);
       if (duration && Number(duration) > 0) query.set("max_minutes", duration);
-      api<{item: CutTitle; source: string; score: number; reasons: string[]; verdict: string; caveat: string}[]>(
+      api<{item: CutTitle; source: string; score: number; reasons: string[]; verdict: string; caveat: string; fit_confidence: string}[]>(
         `/discover?${query}`, {signal: controller.signal},
       ).then(rows => {
         if (!controller.signal.aborted) setConstrained({key: constraintKey, items: rows.flatMap(row =>
           row.item.media_type in mediaTypes ? [{
             ...row.item, source: row.source === "public_tmdb" ? row.item.media_type : "catalogue",
-            score: row.score, reasons: row.reasons, verdict: row.verdict, caveat: row.caveat,
+            score: row.score, reasons: row.reasons, verdict: row.verdict, caveat: row.caveat, fit_confidence: row.fit_confidence,
           }] : [])});
       }).catch(failure => { if (!controller.signal.aborted) setConstraintError(messageFrom(failure)); });
     }, 300);

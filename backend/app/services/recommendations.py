@@ -1,15 +1,15 @@
 """Heuristic ranking with explainable narrative signals and a separate personal evidence layer."""
-from collections import Counter
+from collections import Counter, defaultdict
 import re
 
 from ..models import CatalogueItem, MediaItem, RecommendationFeedback
 from .evidence import EXPLICIT_SOURCES, FRESH_EXCLUSIONS, field, personal_media, same_work, taste_memories
 
 DIMENSIONS = {
-    "Curiosity": {"investigation", "investigate", "investigates", "mystery", "mysterious", "riddle", "conspiracy", "secret", "secrets"},
-    "Stakes": {"survive", "survival", "consequences", "war", "rescue", "escape", "stakes", "risk"},
-    "Progression": {"mission", "journey", "tournament", "mastery", "training", "heist", "strategy", "strategic"},
-    "Payoff potential": {"resolution", "payoff", "unravel", "revelation", "ending", "reveal"},
+    "Curiosity": {"discover", "search", "uncover", "curiosity", "curious", "investigation", "investigate", "investigates", "mystery", "mysterious", "riddle", "conspiracy", "secret", "secrets"},
+    "Stakes": {"protect", "threat", "danger", "surviving", "save", "fight", "survive", "survival", "consequences", "war", "rescue", "escape", "stakes", "risk"},
+    "Progression": {"learn", "build", "develop", "progression", "compete", "train", "mission", "journey", "tournament", "mastery", "training", "heist", "strategy", "strategic"},
+    "Payoff potential": {"resolve", "solve", "resolution", "payoff", "unravel", "revelation", "ending", "reveal"},
 }
 
 
@@ -24,10 +24,15 @@ def words(value):
 def taste(db):
     history = personal_media(db).all()
     liked = [row for row in history if (row.personal_rating or 0) >= 8 or row.sentiment == "like"]
-    evidence = Counter(genre for row in liked for genre in terms(row.genres))
+    evidence = defaultdict(list)
+    for row in liked:
+        for genre in terms(row.genres):
+            evidence[genre].append(row.title)
     tags = Counter(tag for row in liked for tag in terms(row.tags))
     memories = [row for row in taste_memories(db) if row.source in EXPLICIT_SOURCES]
-    return evidence, tags, memories
+    mixed_execution = next((row.title for row in history if row.personal_rating is not None and row.personal_rating < 7
+                            and "concept alone" in row.notes.casefold()), None)
+    return evidence, tags, memories, mixed_execution
 
 
 def score_title(candidate, evidence, feedback=None):
@@ -36,23 +41,31 @@ def score_title(candidate, evidence, feedback=None):
     description = field(candidate, "description") or ""
     narrative = words(" ".join((description, " ".join(tags))))
     signals = [label for label, keywords in DIMENSIONS.items() if narrative & keywords]
-    liked_genres, liked_tags, memories = evidence
+    liked_genres, liked_tags, memories, mixed_execution = evidence
     profile_words = set().union(*(words(row.content) for row in memories))
     score = 45 + 6 * len(signals)
-    reasons = [f"The premise signals {', '.join(label.lower() for label in signals)}."] if signals else []
+    reasons = []
+    strengths = [label for label in signals if profile_words & DIMENSIONS[label]]
+    if strengths:
+        reasons.append("Your preference for " + ", ".join(label.lower() for label in strengths) + " fits the premise.")
+        score += min(8, 3 * len(strengths))
+    elif signals:
+        reasons.append("The premise signals " + ", ".join(label.lower() for label in signals) + ".")
     genre_matches = genres & set(liked_genres)
     if genre_matches:
-        score += min(8, 2 * sum(liked_genres[g] for g in genre_matches))
-        reasons.append("Shares genres with titles you rated highly: " + ", ".join(sorted(genre_matches)[:3]))
+        examples = sorted(set().union(*(liked_genres[genre] for genre in genre_matches)))
+        score += min(8, 2 * len(examples))
+        reasons.append("Shares " + ", ".join(sorted(genre_matches)[:2]) + " with " + ", ".join(examples[:2]) + ", which you liked or rated highly.")
     tag_match = tags & set(liked_tags)
     if tag_match:
         score += min(8, 3 * len(tag_match))
         reasons.append("Shares themes with titles you liked: " + ", ".join(sorted(tag_match)[:3]))
-    if signals and any(narrative & keywords & profile_words for keywords in DIMENSIONS.values()):
-        score += 5
-        reasons.append("The premise overlaps with a saved storytelling preference.")
-    if tags & {"filler", "repetitive", "slow start"}:
-        score -= 8
+    if tags & {"filler", "repetitive", "repetitive progression"}:
+        score -= 12
+        reasons.append("Catalogue tags flag filler or repetition, which you avoid.")
+    if mixed_execution and "Curiosity" in signals and not {"Stakes", "Progression"} & set(signals):
+        score -= 6
+        reasons.append(f"Concept alone is a weaker signal after your reaction to {mixed_execution}.")
     if feedback == "like":
         score += 8
         reasons.append("You explicitly liked this suggestion.")
@@ -111,8 +124,20 @@ def recommend_order(results, limit, diversify=False):
         seen_types[field(candidate["item"], "media_type")] += 1
         seen_genres.update(terms(field(candidate["item"], "genres")))
     for index, result in enumerate(chosen):
-        result.update(verdict="Best pick" if index == 0 else "Consider",
-                      caveat="Execution, hook timing and payoff are unverified from catalogue metadata.")
+        item = result["item"]
+        plot = field(item, "description") or ""
+        genres = terms(field(item, "genres"))
+        runtime = field(item, "runtime")
+        if field(item, "media_type") in {"anime", "tv"}:
+            caveat = "The synopsis leaves episode-to-episode momentum and the eventual payoff unverified."
+        elif runtime_minutes(runtime) and runtime_minutes(runtime) >= 130:
+            caveat = f"The {runtime} runtime is a longer commitment. The premise gives limited evidence about pacing."
+        elif genres & {"mystery", "mystery & thriller", "thriller"}:
+            caveat = "The setup can create curiosity. The synopsis gives little evidence about how well the reveal pays off."
+        else:
+            caveat = "The premise gives limited evidence about whether the stakes build or the ending pays off."
+        result.update(verdict="Best pick" if index == 0 else "Consider", caveat=caveat,
+                      fit_confidence="Moderate" if plot and len(result["reasons"]) > 1 else "Low")
     return chosen
 
 

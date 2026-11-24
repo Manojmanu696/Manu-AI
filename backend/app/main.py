@@ -202,7 +202,7 @@ def data_review(db: Session = Depends(get_db)):
     from .models import LocalAIRecord
     from .services.local_ai_records import serialize_record
     rows = db.query(LocalAIRecord).filter_by(kind="data_review").order_by(LocalAIRecord.created_at.desc())
-    return [serialize_record(row) for row in rows]
+    return [serialize_record(row) for row in rows if not row.data.get("resolved_at")]
 
 
 @app.get("/data/summary")

@@ -134,7 +134,7 @@ def discover(db: Session, media_type=None, limit=24, query=None, language=None, 
     history = personal_media(db).all()
     feedback = feedback_by_title(db)
     hidden = [item for item in catalogue if feedback.get(item.id) in {"watched", "not_for_me"}]
-    excluded = [item for item in history if item.status in FRESH_EXCLUSIONS or item.sentiment == "dislike"] + hidden
+    excluded = [item for item in history if item.status in FRESH_EXCLUSIONS or item.sentiment == "dislike" or item.personal_rating is not None] + hidden
     evidence = taste(db)
     tokens = _tokens(query)
     rows = []

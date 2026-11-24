@@ -11,7 +11,7 @@ from pydantic import ValidationError
 from .config import TMDB_API_KEY
 from .database import get_db
 from .models import CatalogueItem, FilmReview, LocalAIRecord, MediaItem, ViewingCheckpoint
-from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, ReviewCreate, ReviewDraftRequest
+from .schemas import CheckpointCreate, CinemaStatus, MediaCreate, PersonalRating, ReviewCreate, ReviewDraftRequest
 from .services import ollama, tvmaze, title_prediction, watch_listings
 from .services.rating_feedback import latest_feedback, title_key
 from .services.cinema_metadata import SCREEN_TYPES, demo_details, fetch_tmdb_details, search_tmdb
@@ -148,7 +148,7 @@ def browse(db: Session = Depends(get_db)):
             continue
         catalogue.append(title)
     fresh = [
-        {**serialize_title(entry["item"], "catalogue"), **{key: entry[key] for key in ("score", "reasons", "verdict", "caveat")}}
+        {**serialize_title(entry["item"], "catalogue"), **{key: entry[key] for key in ("score", "reasons", "verdict", "caveat", "fit_confidence")}}
         for entry in discover(db, limit=50)
         if entry["item"].media_type in SCREEN_TYPES
     ]
@@ -416,6 +416,14 @@ def add_title(payload: MediaCreate, db: Session = Depends(get_db)):
 def change_status(source: str, item_id: int, payload: CinemaStatus, db: Session = Depends(get_db)):
     item = mutation_target(db, source, item_id, payload.status)
     set_viewing_status(db, item, payload.status, "user")
+    db.commit()
+    return serialize_title(item, "media")
+
+
+@router.put("/titles/{source}/{item_id}/rating")
+def set_personal_rating(source: str, item_id: int, payload: PersonalRating, db: Session = Depends(get_db)):
+    item = mutation_target(db, source, item_id, "unknown")
+    change_rating(db, item, payload.score, "user")
     db.commit()
     return serialize_title(item, "media")
 

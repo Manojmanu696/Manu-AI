@@ -111,13 +111,13 @@ export function CardFacts({ title, prediction, feedback, pending, unavailable }:
     <dl>
       <div><dt>{series ? "Total watch time" : "Runtime"}</dt><dd>{totalWatchTime(title) || "—"}</dd></div>
       {series && <div><dt>Seasons · Episodes</dt><dd>{title.seasons ?? "—"} · {title.episodes ?? "—"}</dd></div>}
-      {title.verdict && <div><dt>Personal fit</dt><dd title="Heuristic ranking signal">{title.score ?? "Unverified"}</dd></div>}
+      {title.verdict && <div><dt>Estimated personal fit</dt><dd>{title.score == null ? "Unverified" : `${title.score}/100`}{title.fit_confidence && ` · ${title.fit_confidence.toLowerCase()} evidence`}</dd></div>}
       {title.verdict && title.media_type === "anime" && <div><dt>English audio</dt><dd>{title.audio_languages?.includes("en") ? "Listed in India" : "Unverified"}</dd></div>}
       {title.intensity && <div><dt>Intensity</dt><dd>{title.intensity}</dd></div>}
-      <div><dt>AI prediction</dt><dd title={prediction?.model}>
+      <div><dt>AI-predicted enjoyment</dt><dd title={prediction?.model}>
         {prediction ? `${prediction.score.toFixed(1)}/10` : unavailable ? "Unavailable" : pending ? "Pending…" : "—"}
       </dd></div>
-      {feedback && <div><dt>Your feedback</dt><dd>{feedback.score.toFixed(1)}/10</dd></div>}
+      {feedback && <div><dt>Chat feedback</dt><dd>{feedback.precision === "approximate" ? "≈ " : ""}{feedback.score.toFixed(1)}/10</dd></div>}
     </dl>
     <div className="cut-poster-providers">
       <span>Watch in India</span>

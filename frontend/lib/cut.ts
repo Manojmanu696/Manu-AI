@@ -7,7 +7,7 @@ export const statuses = {
 export type Status = keyof typeof statuses;
 export type Credit = { name: string; role: string };
 export type WatchProvider = { name: string; access: string; logo_url?: string; url?: string };
-export type RatingFeedback = { score: number; title: string };
+export type RatingFeedback = { score: number; title: string; precision?: "approximate" };
 
 export type Prediction = {
   score: number;
@@ -62,6 +62,7 @@ export type CutTitle = {
   is_demo?: boolean;
   verdict?: string;
   caveat?: string;
+  fit_confidence?: string;
 };
 
 export type BrowseData = { library: CutTitle[]; catalogue: CutTitle[]; fresh: CutTitle[]; reviewed: CutTitle[]; public_search: boolean };

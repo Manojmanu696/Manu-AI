@@ -101,3 +101,7 @@ class ReviewCreate(BaseModel):
 
 class ReviewDraftRequest(BaseModel):
     text: str = Field(min_length=1, max_length=20000)
+
+
+class PersonalRating(BaseModel):
+    score: float | None = Field(ge=1, le=10)

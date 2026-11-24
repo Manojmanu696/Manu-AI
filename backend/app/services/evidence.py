@@ -80,14 +80,14 @@ def change_rating(db, item, score, source, *, reason=""):
         item.personal_rating = score
 
 
-def change_status(db, item, status, source):
+def change_status(db, item, status, source, *, completion_date_known=True):
     if item.id is None:
         db.flush()
-    if item.status == status and (status != "completed" or item.date_completed):
+    if item.status == status:
         return
     previous = item.status
     item.status = status
-    item.date_completed = now() if status == "completed" else None
+    item.date_completed = now() if status == "completed" and completion_date_known else None
     add_record(db, "status_revision", {
         "media": media_ref(item), "previous": previous, "status": status, "source": source,
         "completed_at": item.date_completed.isoformat() if item.date_completed else None,

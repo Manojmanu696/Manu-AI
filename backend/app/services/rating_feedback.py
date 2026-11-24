@@ -29,13 +29,15 @@ def extract_rating_feedback(message, title):
         return None
     return {
         "score": float(matches[0]),
+        **({"precision": "approximate"} if re.search(r"\b(?:around|about)\s+(?:a\s+)?[1-9]", message, re.I)
+           and not re.search(r"\bwould read\b", message, re.I) else {}),
         **{key: title.get(key) for key in ("title", "media_type", "release_year", "genres")},
     }
 
 
 def record_feedback(record):
     data = record.data
-    if record.kind != "chat" or data.get("role") != "user":
+    if record.kind != "chat" or data.get("role") != "user" or data.get("rating_feedback_withdrawn"):
         return None
     title = data.get("title")
     if not isinstance(title, dict) or not isinstance(title.get("title"), str):
@@ -44,7 +46,7 @@ def record_feedback(record):
         return extract_rating_feedback(data["content"], title)
     rating = data["rating_feedback"]
     if isinstance(rating, dict) and type(rating.get("score")) in (int, float) and 1 <= rating["score"] <= 10:
-        return {"score": rating["score"], **{key: title.get(key) for key in ("title", "media_type", "release_year", "genres")}}
+        return {"score": rating["score"], **({"precision": "approximate"} if rating.get("precision") == "approximate" else {}), **{key: title.get(key) for key in ("title", "media_type", "release_year", "genres")}}
     return None
 
 

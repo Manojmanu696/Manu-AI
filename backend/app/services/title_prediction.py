@@ -48,13 +48,13 @@ def prediction_prompt(db, title):
         reasons.setdefault(media_id, row.data.get("reason", ""))
     examples = [
         {"title": item.title, "genres": item.genres, "rating": item.personal_rating,
-         "sentiment": item.sentiment, "status": item.status, "rating_reason": reasons.get(item.id, "")[:400]}
+         "sentiment": item.sentiment, "status": item.status, "viewer_reaction": item.notes[:300], "rating_reason": reasons.get(item.id, "")[:400]}
         for item in history if not same_work(item, title) and item.title.strip().casefold() != name
     ][:16]
     context = {key: title.get(key) for key in (
         "title", "media_type", "release_year", "description", "genres", "runtime", "intensity", "seasons", "episodes",
     )}
-    feedback = latest_feedback(db)
+    feedback = {key: value for key, value in latest_feedback(db).items() if value.get("precision") != "approximate"}
     current_key = title_key(title)
     other_feedback = [rating for key, rating in feedback.items() if key != current_key]
     other_feedback.sort(key=lambda rating: (
@@ -70,7 +70,7 @@ def prediction_prompt(db, title):
             "Address the viewer as you. Keep every field spoiler-free. In explanation, explain the specific score "
             "by weighing the strongest fit against what holds it back, using supplied viewing tastes or ratings. "
             "Completion alone is not evidence of enjoyment. Prioritize curiosity, meaningful stakes, progression and payoff across genres. "
-            "Use explicit reasons without generalizing a reaction to one work to an entire genre. Never infer hook speed, "
+            "Use explicit reasons without generalizing a reaction to one work to an entire genre. An interesting concept alone can underdeliver. A slow opening can pay off, simple plots and superhero spectacle can work, and genius protagonists are optional. Strong payoff alone does not justify a 9+. Never infer hook speed, "
             "English dub or release availability from language or country. Ignore preferences about app design or formatting. "
             "Give two or three distinct, concise points in what_you_might_like and one to three concrete drawbacks "
             "in what_you_might_dislike. Focus on the title's premise, genre, length or intensity when provided. "

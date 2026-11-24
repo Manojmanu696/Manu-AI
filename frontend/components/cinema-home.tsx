@@ -14,7 +14,7 @@ type Title = Pick<MediaItem, "id" | "title" | "media_type" | "description" | "ge
   ott_india?: string;
   watch_url?: string;
 };
-type PickEntry = { item: Title; score?: number; reasons?: string[]; source?: string; verdict?: string; caveat?: string };
+type PickEntry = { item: Title; score?: number; reasons?: string[]; source?: string; verdict?: string; caveat?: string; fit_confidence?: string };
 const types: Record<string, string> = { movie: "Film", tv: "Series", anime: "Anime", game: "Game", book: "Book" };
 
 function screenTitle(entry: PickEntry): CutTitle | undefined {
@@ -22,7 +22,7 @@ function screenTitle(entry: PickEntry): CutTitle | undefined {
   if (!(item.media_type in mediaTypes)) return;
   const media_type = item.media_type as CutTitle["media_type"];
   const source = entry.source === "public_tmdb" ? media_type : entry.source === "local_catalogue" ? "catalogue" : "media";
-  return { ...item, source, media_type, score: entry.score, reasons: entry.reasons, verdict: entry.verdict, caveat: entry.caveat, release_year: item.release_year ?? undefined,
+  return { ...item, source, media_type, score: entry.score, reasons: entry.reasons, verdict: entry.verdict, caveat: entry.caveat, fit_confidence: entry.fit_confidence, release_year: item.release_year ?? undefined,
     ...(source === "media" ? { media_id: item.id } : {}) };
 }
 

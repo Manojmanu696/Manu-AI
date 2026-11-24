@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { cutPath, mediaTypes, messageFrom, safeUrl, splitLabels, statuses, titleApi, titleTime, totalWatchTime, type Checkpoint, type CutTitle, type Prediction, type RatingFeedback, type Review, type Status, type TitleData } from "@/lib/cut";
 import { Artwork, CutFrame, Glyph, Shelf, StatePanel } from "./ui";
@@ -89,17 +89,16 @@ function TitleFacts({ data, region, onRegion }: { data: TitleData; region: strin
   </aside>;
 }
 
-function RatingForm({ title, feedback, onSaved }: { title: CutTitle; feedback: RatingFeedback | null; onSaved: (rating: RatingFeedback) => void }) {
+function RatingForm({ title, onSaved }: { title: CutTitle; onSaved: (title: CutTitle) => void }) {
   const [score, setScore] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  async function save(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function save(value: number | null) {
     setBusy(true);
     setError("");
     try {
-      onSaved(await api<RatingFeedback>(`/local-chat/feedback/${title.source}/${title.id}`, {
-        method: "POST", body: JSON.stringify({ score: Number(score) }),
+      onSaved(await api<CutTitle>(`${titleApi(title)}/rating`, {
+        method: "PUT", body: JSON.stringify({ score: value }),
       }));
       setScore("");
     } catch (failure) {
@@ -108,12 +107,13 @@ function RatingForm({ title, feedback, onSaved }: { title: CutTitle; feedback: R
       setBusy(false);
     }
   }
-  return <form className="cut-rating-feedback" onSubmit={save}>
-    <label htmlFor="cut-feedback-score">Your score for {title.title}</label>
+  return <form className="cut-rating-feedback" onSubmit={event => { event.preventDefault(); void save(Number(score)); }}>
+    <label htmlFor="cut-feedback-score">Your personal rating for {title.title}</label>
     <div>
       <input id="cut-feedback-score" type="number" inputMode="decimal" min={1} max={10} step={0.1} required
-        placeholder={feedback ? feedback.score.toFixed(1) : "1–10"} value={score} onChange={event => setScore(event.target.value)}/>
-      <button type="submit" className="cut-btn cut-secondary" disabled={busy || !score}>{busy ? "Saving…" : "Save rating feedback"}</button>
+        placeholder={title.personal_rating?.toFixed(1) ?? "Unrated"} value={score} onChange={event => setScore(event.target.value)}/>
+      <button type="submit" className="cut-btn cut-secondary" disabled={busy || !score}>{busy ? "Saving…" : "Save personal rating"}</button>
+      {title.personal_rating != null && <button type="button" className="cut-btn cut-secondary" disabled={busy} onClick={() => void save(null)}>Mark unrated</button>}
     </div>
     {error && <p role="alert">{error}</p>}
   </form>;
@@ -250,14 +250,14 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
               <h2 id="cut-prediction-heading">AI recommendation</h2>
               {prediction && <p className="cut-muted">Local Ollama · {prediction.model}</p>}
             </div>
-            {(data.rating_feedback || prediction) && <div className="cut-prediction-score">
-              <span>{data.rating_feedback ? "Your rating feedback" : "AI predicted rating"}</span>
-              <strong>{(data.rating_feedback?.score ?? prediction?.score)?.toFixed(1)}<small>/10</small></strong>
+            {prediction && <div className="cut-prediction-score">
+              <span>AI-predicted enjoyment</span>
+              <strong>{prediction.score.toFixed(1)}<small>/10</small></strong>
             </div>}
           </div>
+          <p className="cut-muted">Your personal rating · {data.title.personal_rating == null ? "Unrated" : `${data.title.personal_rating.toFixed(1)}/10`}</p>
           {data.rating_feedback && <p className="cut-muted">
-            Saved for {data.title.title} and used in future predictions.
-            {prediction && <> AI prediction with your latest profile · {prediction.score.toFixed(1)}/10</>}
+            Chat feedback · {data.rating_feedback.precision === "approximate" ? "≈ " : ""}{data.rating_feedback.score.toFixed(1)}/10
           </p>}
           {prediction ? <>
             <div className="cut-prediction-summary"><h3>Why this AI prediction?</h3><p>{prediction.explanation}</p></div>
@@ -276,12 +276,14 @@ export function CutDetail({ source, id }: { source: string; id: string }) {
           {!!data.rating_history?.length && <details className="cut-rating-feedback">
             <summary>Rating history</summary>
             <ul>{data.rating_history.map((entry, index) => <li key={index}>
-              {entry.range ? `≈ ${entry.range.join("–")}/${entry.scale}` : entry.score == null ? "Unrated" : `${entry.score}/${entry.scale}`}
+              {entry.range ? `Approximate rating · ${entry.range.join("–")}/${entry.scale}` : entry.score == null ? "Unrated" : `${entry.precision === "historical" ? "Historical rating" : "Rating revision"} · ${entry.score}/${entry.scale}`}
               {" · "}{entry.source.replaceAll("_", " ")}{" · "}{new Date(entry.recorded_at).toLocaleDateString()}
             </li>)}</ul>
           </details>}
-          <RatingForm title={data.title} feedback={data.rating_feedback} onSaved={rating => {
-            window.dispatchEvent(new CustomEvent("manu-taste-updated", { detail: { source, id, rating } }));
+          <RatingForm title={data.title} onSaved={result => {
+            setData(current => current && ({ ...current, title: { ...current.title, personal_rating: result.personal_rating, media_id: result.media_id, status: result.status } }));
+            setRetry(value => value + 1);
+            window.dispatchEvent(new CustomEvent("manu-taste-updated"));
           }}/>
         </section>
         {(error || data.metadata_notice) && <p className="cut-inline-notice" role="alert">{error || data.metadata_notice} <button className="cut-text-button" onClick={() => setRetry(value => value + 1)}>Retry</button></p>}

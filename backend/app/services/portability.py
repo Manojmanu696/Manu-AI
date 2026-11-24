@@ -237,6 +237,15 @@ def restore_payload(db: Session, payload: dict, replace: bool = False):
         if kind in {"chat", "assistant_chat"} and (data.get("role") not in {"user", "assistant"} or not isinstance(data.get("content"), str)):
             raise ValueError("Invalid chat record.")
         if record_id in ai_ids:
+            existing = db.get(LocalAIRecord, record_id)
+            if existing and existing.kind == kind and existing.created_at == timestamp:
+                if (kind == "chat" and data.get("rating_feedback_withdrawn")
+                        and not existing.data.get("rating_feedback_withdrawn")
+                        and all(existing.data.get(key) == data.get(key) for key in ("role", "content", "title"))):
+                    existing.data = {**existing.data, "rating_feedback_withdrawn": data["rating_feedback_withdrawn"]}
+                if (kind == "data_review" and data.get("resolved_at") and not existing.data.get("resolved_at")
+                        and existing.data.get("subject") == data.get("subject")):
+                    existing.data = {**existing.data, "resolved_at": data["resolved_at"], "resolution": data.get("resolution")}
             continue
         if kind in {"rating_revision", "status_revision"} and isinstance(data.get("media"), dict):
             old_id = data["media"].get("id")
